@@ -25,13 +25,13 @@ int main(void)
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
-    int fieldWidth = 10000;
-    int fieldHeight = 10000;
+    int fieldWidth = 2000;
+    int fieldHeight = 2000;
 
     Ship ship = {
         .dir = 0,
         .center = (Vector2) {screenWidth / 2, screenHeight / 2},
-        .deltaCenter = (Vector2) {0, 0},
+        .deltaCenter = (Vector2) {fieldWidth / 2, fieldHeight / 2},
     };
 
     // Main game loop
@@ -102,9 +102,14 @@ int main(void)
                 .x = ship.center.x + cos(ship.dir + m) * 15,
                 .y = ship.center.y - sin(ship.dir + m) * 15,
             };
-            
-        
+
             DrawTriangleLines(v1, v2, v3, WHITE);
+            //
+
+            // Ship position info
+            char position_buf[14];
+            sprintf(position_buf, "(%d; %d)", (int)ship.deltaCenter.x, (int)ship.deltaCenter.y);
+            DrawText(position_buf, ship.center.x + 20, ship.center.y, 26, LIGHTGRAY);
             //
         EndDrawing();
         //----------------------------------------------------------------------------------
