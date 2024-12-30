@@ -1,4 +1,4 @@
-#include "raylib.h"
+#include "include/raylib.h"
 #include <math.h>
 
 typedef struct 
@@ -8,6 +8,64 @@ typedef struct
     Vector2 deltaCenter;
 } Ship;
 
+int screenWidth = 1600;
+int screenHeight = 900;
+
+int fieldWidth = 2000;
+int fieldHeight = 2000;
+
+int net_gap = 100;
+
+void draw_net(Ship ship) {
+    // Net vertical    
+    int startX = -fmod(ship.deltaCenter.x, net_gap);
+    
+    int finishX = screenWidth;
+  
+    for (int i = startX; i < finishX; i += net_gap) {
+        int y1 = 0;
+        int y2 = screenHeight;        
+        DrawLine(i, y1, i, y2, LIME);
+    }
+
+    int startY = -fmod(ship.deltaCenter.y, net_gap);
+
+    int finishY = screenHeight;
+
+    // Net horizontal
+    for (int i = startY; i < finishY; i += net_gap) {
+        int x1 = 0;
+        int x2 = screenWidth;
+
+        DrawLine(x1, i, x2, i, LIME);
+    }
+    //
+
+    // Border lines
+    
+    if (ship.deltaCenter.y < ship.center.y) {
+        int y = ship.center.y - ship.deltaCenter.y;
+	DrawLine(0, y, screenWidth, y, RED);
+    }
+
+    if (fieldHeight - ship.deltaCenter.y < ship.center.y) {
+	int gap = ship.center.y - (fieldHeight - ship.deltaCenter.y);
+        int y = screenHeight - gap;
+	DrawLine(0, y, screenWidth, y, RED);
+    }
+
+    if (ship.deltaCenter.x < ship.center.x) {
+	int x = ship.center.x - ship.deltaCenter.x;
+	DrawLine(x, 0, x, screenHeight, RED);
+    }
+
+    if (fieldWidth - ship.deltaCenter.x < ship.center.x) {
+	int gap = ship.center.x - (fieldWidth - ship.deltaCenter.x);
+        int x = screenWidth - gap;
+	DrawLine(x, 0, x, screenHeight, RED);
+    }
+}
+
 //------------------------------------------------------------------------------------
 // Program main entry point
 //------------------------------------------------------------------------------------
@@ -15,9 +73,6 @@ int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    int screenWidth = 1600;
-    int screenHeight = 900;
-
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 
     InitWindow(screenWidth, screenHeight, "Asteroids");
@@ -25,13 +80,10 @@ int main(void)
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
-    int fieldWidth = 2000;
-    int fieldHeight = 2000;
-
     Ship ship = {
         .dir = 0,
-        .center = (Vector2) {screenWidth / 2, screenHeight / 2},
-        .deltaCenter = (Vector2) {fieldWidth / 2, fieldHeight / 2},
+	.center = (Vector2) {screenWidth / 2.0, screenHeight / 2.0},
+	.deltaCenter = (Vector2) {fieldWidth / 2.0, fieldHeight / 2.0},
     };
 
     // Main game loop
@@ -42,8 +94,8 @@ int main(void)
         // TODO: Update your variables here
         //----------------------------------------------------------------------------------
 
-        screenWidth = GetScreenWidth();
-        screenHeight = GetScreenHeight();
+        // screenWidth = GetScreenWidth();
+        // screenHeight = GetScreenHeight();
 
         if (IsKeyPressed(KEY_F11)) {
             ToggleFullscreen();
@@ -75,15 +127,7 @@ int main(void)
 
             ClearBackground(DARKGRAY);
 
-            // Net
-            for (int i = -fmod(ship.deltaCenter.x, 100); i < screenWidth; i += 100) {
-                DrawLine(i, 0, i, screenHeight, LIME);
-            }
-
-            for (int i = -fmod(ship.deltaCenter.y, 100); i < screenHeight; i += 100) {
-                DrawLine(0, i, screenWidth, i, LIME);
-            }
-            //
+            draw_net(ship);
 
             // Ship
             Vector2 v1 = (Vector2){
@@ -104,7 +148,7 @@ int main(void)
             };
 
             DrawTriangleLines(v1, v2, v3, WHITE);
-            //
+            // --------------
 
             // Ship position info
             char position_buf[14];
