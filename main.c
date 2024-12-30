@@ -1,7 +1,7 @@
 #include "include/raylib.h"
 #include <math.h>
 
-typedef struct 
+typedef struct
 {
     float dir;
     Vector2 center;
@@ -17,14 +17,14 @@ int fieldHeight = 2000;
 int net_gap = 100;
 
 void draw_net(Ship ship) {
-    // Net vertical    
+    // Net vertical
     int startX = -fmod(ship.deltaCenter.x, net_gap);
-    
+
     int finishX = screenWidth;
-  
+
     for (int i = startX; i < finishX; i += net_gap) {
         int y1 = 0;
-        int y2 = screenHeight;        
+        int y2 = screenHeight;
         DrawLine(i, y1, i, y2, LIME);
     }
 
@@ -42,7 +42,7 @@ void draw_net(Ship ship) {
     //
 
     // Border lines
-    
+
     if (ship.deltaCenter.y < ship.center.y) {
         int y = ship.center.y - ship.deltaCenter.y;
 	DrawLine(0, y, screenWidth, y, RED);
@@ -87,16 +87,7 @@ int main(void)
     };
 
     // Main game loop
-    while (!WindowShouldClose())    // Detect window close button or ESC key
-    {
-        // Update
-        //----------------------------------------------------------------------------------
-        // TODO: Update your variables here
-        //----------------------------------------------------------------------------------
-
-        // screenWidth = GetScreenWidth();
-        // screenHeight = GetScreenHeight();
-
+    while (!WindowShouldClose()) {
         if (IsKeyPressed(KEY_F11)) {
             ToggleFullscreen();
             screenWidth = GetScreenWidth();
@@ -112,19 +103,34 @@ int main(void)
         }
 
         if (IsKeyDown(KEY_UP)) {
-            ship.deltaCenter.x += cosf(ship.dir) * 5;
-            ship.deltaCenter.y -= sinf(ship.dir) * 5;
+	    int x = ship.deltaCenter.x + cosf(ship.dir) * 5;
+	    int y = ship.deltaCenter.y - sinf(ship.dir) * 5;
+
+	    if (0 <= x && x <= fieldWidth) {
+		ship.deltaCenter.x = x;
+	    }
+
+	    if (0 <= y && y <= fieldHeight) {
+		ship.deltaCenter.y = y;
+	    }
         }
 
         if (IsKeyDown(KEY_DOWN)) {
-            ship.deltaCenter.x -= cosf(ship.dir) * 5;
-            ship.deltaCenter.y += sinf(ship.dir) * 5;
+            int x = ship.deltaCenter.x - cosf(ship.dir) * 5;
+            int y = ship.deltaCenter.y + sinf(ship.dir) * 5;
+
+	    if (0 <= x && x <= fieldWidth) {
+		ship.deltaCenter.x = x;
+	    }
+
+	    if (0 <= y && y <= fieldHeight) {
+		ship.deltaCenter.y = y;
+	    }
         }
 
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
-
             ClearBackground(DARKGRAY);
 
             draw_net(ship);
