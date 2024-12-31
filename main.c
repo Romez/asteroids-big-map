@@ -1,11 +1,12 @@
 #include "include/raylib.h"
 #include <math.h>
+#include <stdio.h>
 
-typedef struct
-{
+typedef struct {
     float dir;
-    Vector2 center;
-    Vector2 deltaCenter;
+    Vector2 screen_pos;
+    Vector2 field_pos;
+    float speed;
 } Ship;
 
 int screenWidth = 1600;
@@ -18,7 +19,7 @@ int net_gap = 100;
 
 void draw_net(Ship ship) {
     // Net vertical
-    int startX = -fmod(ship.deltaCenter.x, net_gap);
+    int startX = -fmod(ship.field_pos.x, net_gap);
 
     int finishX = screenWidth;
 
@@ -28,7 +29,7 @@ void draw_net(Ship ship) {
         DrawLine(i, y1, i, y2, LIME);
     }
 
-    int startY = -fmod(ship.deltaCenter.y, net_gap);
+    int startY = -fmod(ship.field_pos.y, net_gap);
 
     int finishY = screenHeight;
 
@@ -43,47 +44,68 @@ void draw_net(Ship ship) {
 
     // Border lines
 
-    if (ship.deltaCenter.y < ship.center.y) {
-        int y = ship.center.y - ship.deltaCenter.y;
+    if (ship.field_pos.y < ship.screen_pos.y) {
+        int y = ship.screen_pos.y - ship.field_pos.y;
 	DrawLine(0, y, screenWidth, y, RED);
     }
 
-    if (fieldHeight - ship.deltaCenter.y < ship.center.y) {
-	int gap = ship.center.y - (fieldHeight - ship.deltaCenter.y);
+    if (fieldHeight - ship.field_pos.y < ship.screen_pos.y) {
+	int gap = ship.screen_pos.y - (fieldHeight - ship.field_pos.y);
         int y = screenHeight - gap;
 	DrawLine(0, y, screenWidth, y, RED);
     }
 
-    if (ship.deltaCenter.x < ship.center.x) {
-	int x = ship.center.x - ship.deltaCenter.x;
+    if (ship.field_pos.x < ship.screen_pos.x) {
+	int x = ship.screen_pos.x - ship.field_pos.x;
 	DrawLine(x, 0, x, screenHeight, RED);
     }
 
-    if (fieldWidth - ship.deltaCenter.x < ship.center.x) {
-	int gap = ship.center.x - (fieldWidth - ship.deltaCenter.x);
+    if (fieldWidth - ship.field_pos.x < ship.screen_pos.x) {
+	int gap = ship.screen_pos.x - (fieldWidth - ship.field_pos.x);
         int x = screenWidth - gap;
 	DrawLine(x, 0, x, screenHeight, RED);
     }
 }
 
+void draw_ship(Ship ship) {
+    Vector2 v1 = (Vector2){
+	.x = ship.screen_pos.x + (cosf(ship.dir) * 15),
+	.y = ship.screen_pos.y - (sinf(ship.dir) * 15),
+    };
+
+    float l = (3 * PI) / 4;
+    Vector2 v2 = (Vector2){
+	.x = ship.screen_pos.x + cos(ship.dir + l) * 15,
+	.y = ship.screen_pos.y - sin(ship.dir + l) * 15,
+    };
+
+    float m = (5 * PI) / 4;
+    Vector2 v3 = (Vector2){
+	.x = ship.screen_pos.x + cos(ship.dir + m) * 15,
+	.y = ship.screen_pos.y - sin(ship.dir + m) * 15,
+    };
+
+    DrawTriangleLines(v1, v2, v3, WHITE);    
+}
+
 //------------------------------------------------------------------------------------
 // Program main entry point
 //------------------------------------------------------------------------------------
-int main(void)
-{
+int main(void) {
     // Initialization
     //--------------------------------------------------------------------------------------
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 
     InitWindow(screenWidth, screenHeight, "Asteroids");
 
-    SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60); // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
     Ship ship = {
         .dir = 0,
-	.center = (Vector2) {screenWidth / 2.0, screenHeight / 2.0},
-	.deltaCenter = (Vector2) {fieldWidth / 2.0, fieldHeight / 2.0},
+	.screen_pos = (Vector2) {screenWidth / 2.0, screenHeight / 2.0},
+	.field_pos = (Vector2) {fieldWidth / 2.0, fieldHeight / 2.0},
+	.speed = 0.0,
     };
 
     // Main game loop
@@ -99,68 +121,78 @@ int main(void)
         }
 
         if (IsKeyDown(KEY_RIGHT)) {
-            ship.dir = fmod(ship.dir - 0.1, 2 * PI);
+	    if (ship.dir > 0.1) {
+		ship.dir = fmod(ship.dir - 0.1, 2 * PI);
+	    } else {
+		ship.dir = 2 * PI;		
+	    }            
         }
 
         if (IsKeyDown(KEY_UP)) {
-	    int x = ship.deltaCenter.x + cosf(ship.dir) * 5;
-	    int y = ship.deltaCenter.y - sinf(ship.dir) * 5;
-
-	    if (0 <= x && x <= fieldWidth) {
-		ship.deltaCenter.x = x;
-	    }
-
-	    if (0 <= y && y <= fieldHeight) {
-		ship.deltaCenter.y = y;
-	    }
+	    if (ship.speed < 6) {
+		ship.speed += 0.2;
+	    }	    
         }
 
         if (IsKeyDown(KEY_DOWN)) {
-            int x = ship.deltaCenter.x - cosf(ship.dir) * 5;
-            int y = ship.deltaCenter.y + sinf(ship.dir) * 5;
+	    if (ship.speed > -6) {
+		ship.speed -= 0.2;
+	    }
+        }
+
+	if (ship.speed > 0.0) {
+	    float x = ship.field_pos.x + cosf(ship.dir) * ship.speed;
+	    float y = ship.field_pos.y - sinf(ship.dir) * ship.speed;
 
 	    if (0 <= x && x <= fieldWidth) {
-		ship.deltaCenter.x = x;
+		ship.field_pos.x = x;
+	    }
+	    
+	    if (0 <= y && y <= fieldHeight) {
+		ship.field_pos.y = y;
+	    }
+	    
+	    if (ship.speed > 0.07) {
+		ship.speed -= 0.07;
+	    } else {
+		ship.speed = 0.0;
+	    }	    
+	}
+
+	if (ship.speed < 0.0) {
+	    float x = ship.field_pos.x + cosf(ship.dir) * ship.speed;
+            float y = ship.field_pos.y - sinf(ship.dir) * ship.speed;
+
+	    if (0 <= x && x <= fieldWidth) {
+		ship.field_pos.x = x;
 	    }
 
 	    if (0 <= y && y <= fieldHeight) {
-		ship.deltaCenter.y = y;
+		ship.field_pos.y = y;
 	    }
-        }
+
+	    if (ship.speed < 0.07) {
+		ship.speed += 0.07;
+	    } else {
+		ship.speed = 0.0;
+	    }
+	}
 
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
-            ClearBackground(DARKGRAY);
+	ClearBackground(DARKGRAY);
 
-            draw_net(ship);
+	draw_net(ship);	
+	draw_ship(ship);
+	
+	// --------------
 
-            // Ship
-            Vector2 v1 = (Vector2){
-                .x = ship.center.x + (cosf(ship.dir) * 15),
-                .y = ship.center.y - (sinf(ship.dir) * 15),
-            };
-
-            float l = (3 * PI) / 4;
-            Vector2 v2 = (Vector2){
-                .x = ship.center.x + cos(ship.dir + l) * 15,
-                .y = ship.center.y - sin(ship.dir + l) * 15,
-            };
-
-            float m = (5 * PI) / 4;
-            Vector2 v3 = (Vector2){
-                .x = ship.center.x + cos(ship.dir + m) * 15,
-                .y = ship.center.y - sin(ship.dir + m) * 15,
-            };
-
-            DrawTriangleLines(v1, v2, v3, WHITE);
-            // --------------
-
-            // Ship position info
-            char position_buf[14];
-            sprintf(position_buf, "(%d; %d)", (int)ship.deltaCenter.x, (int)ship.deltaCenter.y);
-            DrawText(position_buf, ship.center.x + 20, ship.center.y, 26, LIGHTGRAY);
-            //
+	// Ship position info
+	char position_buf[26];
+	sprintf(position_buf, "(%d; %d), %.2f, %.2f", (int)ship.field_pos.x, (int)ship.field_pos.y, ship.speed, ship.dir);
+	DrawText(position_buf, ship.screen_pos.x + 20, ship.screen_pos.y, 26, LIGHTGRAY);
+	//
         EndDrawing();
         //----------------------------------------------------------------------------------
     }
