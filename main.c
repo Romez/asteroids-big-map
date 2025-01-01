@@ -7,6 +7,7 @@ typedef struct {
     Vector2 screen_pos;
     Vector2 field_pos;
     float speed;
+    bool is_engine_working;
 } Ship;
 
 int screenWidth = 1600;
@@ -75,17 +76,54 @@ void draw_ship(Ship ship) {
 
     float l = (3 * PI) / 4;
     Vector2 v2 = (Vector2){
-	.x = ship.screen_pos.x + cos(ship.dir + l) * 15,
-	.y = ship.screen_pos.y - sin(ship.dir + l) * 15,
+	.x = ship.screen_pos.x + cosf(ship.dir + l) * 15,
+	.y = ship.screen_pos.y - sinf(ship.dir + l) * 15,
     };
 
-    float m = (5 * PI) / 4;
+    float r = (5 * PI) / 4;
     Vector2 v3 = (Vector2){
-	.x = ship.screen_pos.x + cos(ship.dir + m) * 15,
-	.y = ship.screen_pos.y - sin(ship.dir + m) * 15,
+	.x = ship.screen_pos.x + cosf(ship.dir + r) * 15,
+	.y = ship.screen_pos.y - sinf(ship.dir + r) * 15,
     };
 
-    DrawTriangleLines(v1, v2, v3, WHITE);    
+    if (ship.is_engine_working) {
+	Vector2 v4 = (Vector2) {
+	    .x = ship.screen_pos.x + cosf(ship.dir + l + (PI / 12)) * 18,
+	    .y = ship.screen_pos.y - sinf(ship.dir + l + (PI / 12)) * 18,
+	};
+
+	Vector2 v5 = (Vector2) {
+	    .x = ship.screen_pos.x + cosf(ship.dir + r - (PI / 12)) * 18,
+	    .y = ship.screen_pos.y - sinf(ship.dir + r - (PI / 12)) * 18,
+	};
+
+	Vector2 v6 = (Vector2) {
+	    .x = ship.screen_pos.x + cosf(ship.dir + l + (PI / 6)) * 21,
+	    .y = ship.screen_pos.y - sinf(ship.dir + l + (PI / 6)) * 21,
+	};
+
+	Vector2 v7 = (Vector2) {
+	    .x = ship.screen_pos.x + cosf(ship.dir + r - (PI / 6)) * 21,
+	    .y = ship.screen_pos.y - sinf(ship.dir + r - (PI / 6)) * 21,
+	};
+
+	Vector2 v8 = (Vector2) {
+	    .x = ship.screen_pos.x + cosf(ship.dir + l + (PI / 5)) * 26,
+	    .y = ship.screen_pos.y - sinf(ship.dir + l + (PI / 5)) * 26,
+	};
+
+	Vector2 v9 = (Vector2) {
+	    .x = ship.screen_pos.x + cosf(ship.dir + r - (PI / 5)) * 26,
+	    .y = ship.screen_pos.y - sinf(ship.dir + r - (PI / 5)) * 26,
+	};
+
+	DrawLineV(v2, v3, RED);
+	DrawLineV(v4, v5, RED);
+	DrawLineV(v6, v7, RED);
+	DrawLineV(v8, v9, RED);
+    }
+
+    DrawTriangleLines(v1, v2, v3, WHITE);
 }
 
 //------------------------------------------------------------------------------------
@@ -106,6 +144,7 @@ int main(void) {
 	.screen_pos = (Vector2) {screenWidth / 2.0, screenHeight / 2.0},
 	.field_pos = (Vector2) {fieldWidth / 2.0, fieldHeight / 2.0},
 	.speed = 0.0,
+	.is_engine_working = false,
     };
 
     // Main game loop
@@ -124,20 +163,22 @@ int main(void) {
 	    if (ship.dir > 0.1) {
 		ship.dir = fmod(ship.dir - 0.1, 2 * PI);
 	    } else {
-		ship.dir = 2 * PI;		
-	    }            
+		ship.dir = 2 * PI;
+	    }
         }
 
         if (IsKeyDown(KEY_UP)) {
 	    if (ship.speed < 6) {
 		ship.speed += 0.2;
-	    }	    
+	    }
+	    ship.is_engine_working = true;
         }
 
         if (IsKeyDown(KEY_DOWN)) {
 	    if (ship.speed > -6) {
 		ship.speed -= 0.2;
 	    }
+	    ship.is_engine_working = true;
         }
 
 	if (ship.speed > 0.0) {
@@ -147,16 +188,16 @@ int main(void) {
 	    if (0 <= x && x <= fieldWidth) {
 		ship.field_pos.x = x;
 	    }
-	    
+
 	    if (0 <= y && y <= fieldHeight) {
 		ship.field_pos.y = y;
 	    }
-	    
+
 	    if (ship.speed > 0.07) {
 		ship.speed -= 0.07;
 	    } else {
 		ship.speed = 0.0;
-	    }	    
+	    }
 	}
 
 	if (ship.speed < 0.0) {
@@ -183,9 +224,9 @@ int main(void) {
         BeginDrawing();
 	ClearBackground(DARKGRAY);
 
-	draw_net(ship);	
+	draw_net(ship);
 	draw_ship(ship);
-	
+
 	// --------------
 
 	// Ship position info
@@ -195,6 +236,8 @@ int main(void) {
 	//
         EndDrawing();
         //----------------------------------------------------------------------------------
+
+	ship.is_engine_working = false;
     }
 
     // De-Initialization
