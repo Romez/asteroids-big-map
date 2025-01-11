@@ -2,8 +2,9 @@
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
-#define BULLETS_LEN 5
+#define SHOTS_MAX_LEN 5
 
 #define SCREEN_WIDTH 1600
 #define SCREEN_HEIGHT 900
@@ -21,7 +22,7 @@ typedef struct {
 typedef struct {
     Vector2 pos;
     float dir;
-} Bullet;
+} Shot;
 
 typedef struct {
     Vector2 pos;
@@ -180,23 +181,20 @@ int main(void) {
 	{.pos = (Vector2){900, 900}},
     };
 
-    /*
-      size_t bullets_size = 0;
-      Bullet bullets[BULLETS_LEN] = {0};
-    */
+    size_t shots_size = 0;
+    Shot shots[SHOTS_MAX_LEN];
 
     // Main game loop
     while (!WindowShouldClose()) {
-	/*
-	  if (IsKeyPressed(KEY_SPACE)) {
-	  if (bullets_size < BULLETS_LEN) {
-	  bullets[bullets_size++] = (Bullet){
-	  .pos = ship.field_pos,
-	  .dir = ship.dir,
-	  };
-	  }
-	  }
-	*/
+	if (IsKeyPressed(KEY_SPACE)) {
+	    if (shots_size < SHOTS_MAX_LEN) {
+		Shot shot;
+		shot.dir = ship.dir;
+		shot.pos = ship.field_pos;
+
+		shots[shots_size++] = shot;
+	    }
+	}
 
 	if (IsKeyDown(KEY_LEFT)) {
 	    ship.dir = fmod(ship.dir + 0.1, 2 * PI);
@@ -262,6 +260,22 @@ int main(void) {
 	    }
 	}
 
+	// shots
+	for(size_t i = 0; i < shots_size; i++) {
+	    Shot shot = shots[i];
+
+	    shot.pos.x += cosf(shot.dir) * 2;
+	    shot.pos.y -= sinf(shot.dir) * 2;
+
+	    if (0 <= shot.pos.x && shot.pos.x <= fieldWidth &&
+		0 <= shot.pos.y && shot.pos.y <= fieldHeight) {
+		shots[i] = shot;
+	    } else {
+		memcpy(&shots[i], &shots[i+1], sizeof(Shot) * (shots_size - i - 1));
+		shots_size -= 1;
+	    }
+	}
+
 	// Draw
 	//----------------------------------------------------------------------------------
 	BeginDrawing();
@@ -270,6 +284,21 @@ int main(void) {
 	draw_net(ship);
 	draw_ship(ship);
 	draw_healths(ship, healths, healths_size);
+
+	for(size_t i = 0; i < shots_size; i++) {
+	    Shot shot = shots[i];
+
+            float x = ship.field_pos.x - shot.pos.x;
+	    float y = ship.field_pos.y - shot.pos.y;
+
+            if (fabs(x) < SCREEN_CENTER_X && fabs(y) < SCREEN_CENTER_Y) {
+		float x2 = x + cosf(shot.dir) * 20;
+		float y2 = y - sinf(shot.dir) * 20;
+
+		DrawLine(SCREEN_CENTER_X - x, SCREEN_CENTER_Y - y,
+			 SCREEN_CENTER_X - x2, SCREEN_CENTER_Y - y2, BLUE);
+	    }
+	}
 
 	// --------------
 
