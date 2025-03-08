@@ -1,1 +1,1 @@
-emcc -o web_dist/main.html main.c -Os -Wall ./ray_wasm/libraylib.a -I. -I./include -lm -s USE_GLFW=3 -s ASYNCIFY --shell-file ./ray_wasm/minshell.html -DPLATFORM_WEB
+emcc -o docs/index.html main.c -Os -Wall ./ray_wasm/libraylib.a -I. -I./include -lm -s USE_GLFW=3 -s ASYNCIFY --shell-file ./ray_wasm/minshell.html -DPLATFORM_WEB
