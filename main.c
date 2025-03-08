@@ -1,4 +1,5 @@
 #include "include/raylib.h"
+#include "include/raymath.h"
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -9,11 +10,14 @@
 #define SCREEN_WIDTH 1600
 #define SCREEN_HEIGHT 900
 
+const float ROTATION_SPEED = PI / 32;
+const float MAX_SPEED = 6;
+
 int fieldWidth = 2000;
 int fieldHeight = 2000;
 
 typedef struct {
-    float dir;
+    Vector2 dir;
     Vector2 field_pos;
     float speed;
     bool is_engine_working;
@@ -21,15 +25,20 @@ typedef struct {
 
 typedef struct {
     Vector2 pos;
-    float dir;
+    Vector2 dir;
 } Shot;
 
 typedef struct {
     Vector2 pos;
 } Health;
 
-float SCREEN_CENTER_X = SCREEN_WIDTH / 2.0;
-float SCREEN_CENTER_Y = SCREEN_HEIGHT / 2.0;
+const float SCREEN_CENTER_X = SCREEN_WIDTH / 2.0;
+const float SCREEN_CENTER_Y = SCREEN_HEIGHT / 2.0;
+
+Vector2 screen_center_v = {
+	.x = SCREEN_CENTER_X,
+	.y = SCREEN_CENTER_Y
+};
 
 int net_gap = 100;
 
@@ -40,9 +49,9 @@ void draw_net(Ship ship) {
     int finishX = SCREEN_WIDTH;
 
     for (int i = startX; i < finishX; i += net_gap) {
-	int y1 = 0;
-	int y2 = SCREEN_HEIGHT;
-	DrawLine(i, y1, i, y2, LIME);
+		int y1 = 0;
+		int y2 = SCREEN_HEIGHT;
+		DrawLine(i, y1, i, y2, LIME);
     }
 
     int startY = -fmod(ship.field_pos.y, net_gap);
@@ -51,107 +60,76 @@ void draw_net(Ship ship) {
 
     // Net horizontal
     for (int i = startY; i < finishY; i += net_gap) {
-	int x1 = 0;
-	int x2 = SCREEN_WIDTH;
+		int x1 = 0;
+		int x2 = SCREEN_WIDTH;
 
-	DrawLine(x1, i, x2, i, LIME);
+		DrawLine(x1, i, x2, i, LIME);
     }
-    //
 
     // Border lines
 
     if (ship.field_pos.y < SCREEN_CENTER_Y) {
-	int y = SCREEN_CENTER_Y - ship.field_pos.y;
-	DrawLine(0, y, SCREEN_WIDTH, y, RED);
+		int y = SCREEN_CENTER_Y - ship.field_pos.y;
+		DrawLine(0, y, SCREEN_WIDTH, y, RED);
     }
 
     if (fieldHeight - ship.field_pos.y < SCREEN_CENTER_Y) {
-	int gap = SCREEN_CENTER_Y - (fieldHeight - ship.field_pos.y);
-	int y = SCREEN_HEIGHT - gap;
-	DrawLine(0, y, SCREEN_WIDTH, y, RED);
+		int gap = SCREEN_CENTER_Y - (fieldHeight - ship.field_pos.y);
+		int y = SCREEN_HEIGHT - gap;
+		DrawLine(0, y, SCREEN_WIDTH, y, RED);
     }
 
     if (ship.field_pos.x < SCREEN_CENTER_X) {
-	int x = SCREEN_CENTER_X - ship.field_pos.x;
-	DrawLine(x, 0, x, SCREEN_HEIGHT, RED);
+		int x = SCREEN_CENTER_X - ship.field_pos.x;
+		DrawLine(x, 0, x, SCREEN_HEIGHT, RED);
     }
 
     if (fieldWidth - ship.field_pos.x < SCREEN_CENTER_X) {
-	int gap = SCREEN_CENTER_X - (fieldWidth - ship.field_pos.x);
-	int x = SCREEN_WIDTH - gap;
-	DrawLine(x, 0, x, SCREEN_HEIGHT, RED);
+		int gap = SCREEN_CENTER_X - (fieldWidth - ship.field_pos.x);
+		int x = SCREEN_WIDTH - gap;
+		DrawLine(x, 0, x, SCREEN_HEIGHT, RED);
     }
 }
 
 void draw_ship(Ship ship) {
-    Vector2 v1 = (Vector2){
-	.x = SCREEN_CENTER_X + (cosf(ship.dir) * 15),
-	.y = SCREEN_CENTER_Y - (sinf(ship.dir) * 15),
-    };
+	Vector2 ship_size = Vector2Scale(ship.dir, 15);
 
-    float l = (3 * PI) / 4;
-    Vector2 v2 = (Vector2){
-	.x = SCREEN_CENTER_X + cosf(ship.dir + l) * 15,
-	.y = SCREEN_CENTER_Y - sinf(ship.dir + l) * 15,
-    };
+	Vector2 v1 = Vector2Add(screen_center_v, ship_size);
 
-    float r = (5 * PI) / 4;
-    Vector2 v3 = (Vector2){
-	.x = SCREEN_CENTER_X + cosf(ship.dir + r) * 15,
-	.y = SCREEN_CENTER_Y - sinf(ship.dir + r) * 15,
-    };
+	float l = (3 * PI) / 4;
+	Vector2 v2 = Vector2Add(screen_center_v, Vector2Rotate(ship_size, l));
+
+	float r = (5 * PI) / 4;
+	Vector2 v3 = Vector2Add(screen_center_v, Vector2Rotate(ship_size, r));
+
+	DrawTriangleLines(v1, v2, v3, WHITE);
 
     if (ship.is_engine_working) {
-	Vector2 v4 = (Vector2){
-	    .x = SCREEN_CENTER_X + cosf(ship.dir + l + (PI / 12)) * 18,
-	    .y = SCREEN_CENTER_Y - sinf(ship.dir + l + (PI / 12)) * 18,
-	};
-
-	Vector2 v5 = (Vector2){
-	    .x = SCREEN_CENTER_X + cosf(ship.dir + r - (PI / 12)) * 18,
-	    .y = SCREEN_CENTER_Y - sinf(ship.dir + r - (PI / 12)) * 18,
-	};
-
-	Vector2 v6 = (Vector2){
-	    .x = SCREEN_CENTER_X + cosf(ship.dir + l + (PI / 6)) * 21,
-	    .y = SCREEN_CENTER_Y - sinf(ship.dir + l + (PI / 6)) * 21,
-	};
-
-	Vector2 v7 = (Vector2){
-	    .x = SCREEN_CENTER_X + cosf(ship.dir + r - (PI / 6)) * 21,
-	    .y = SCREEN_CENTER_Y - sinf(ship.dir + r - (PI / 6)) * 21,
-	};
-
-	Vector2 v8 = (Vector2){
-	    .x = SCREEN_CENTER_X + cosf(ship.dir + l + (PI / 5)) * 26,
-	    .y = SCREEN_CENTER_Y - sinf(ship.dir + l + (PI / 5)) * 26,
-	};
-
-	Vector2 v9 = (Vector2){
-	    .x = SCREEN_CENTER_X + cosf(ship.dir + r - (PI / 5)) * 26,
-	    .y = SCREEN_CENTER_Y - sinf(ship.dir + r - (PI / 5)) * 26,
-	};
-
-	DrawLineV(v2, v3, RED);
-	DrawLineV(v4, v5, RED);
-	DrawLineV(v6, v7, RED);
-	DrawLineV(v8, v9, RED);
+		for (int i = 0; i < 4; i++) {
+			Vector2 ve1 = Vector2Add(v2, Vector2Scale(ship.dir, -5 * i));
+			Vector2 ve2 = Vector2Add(v3, Vector2Scale(ship.dir, -5 * i));
+			DrawLineV(ve1, ve2, RED);
+		}
     }
-
-    DrawTriangleLines(v1, v2, v3, WHITE);
 }
 
 void draw_healths(Ship ship, Health *healths, size_t healths_size) {
     for (int i = 0; i < healths_size; i++) {
-	Health h = healths[i];
-	float x = ship.field_pos.x - h.pos.x;
-	float y = ship.field_pos.y - h.pos.y;
-	float radius = 26.0;
-	if (fabs(x) - radius < SCREEN_CENTER_X &&
-	    fabs(y) - radius < SCREEN_CENTER_Y) {
-	    DrawCircle(SCREEN_CENTER_X - x, SCREEN_CENTER_Y - y, radius, RED);
-	}
+		Health h = healths[i];
+		float x = ship.field_pos.x - h.pos.x;
+		float y = ship.field_pos.y - h.pos.y;
+		float radius = 26.0;
+		if (fabs(x) - radius < SCREEN_CENTER_X &&
+			fabs(y) - radius < SCREEN_CENTER_Y) {
+			DrawCircle(SCREEN_CENTER_X - x, SCREEN_CENTER_Y - y, radius, RED);
+		}
     }
+}
+
+void draw_info(Ship ship) {
+	char position_buf[26];
+	sprintf(position_buf, "(%d; %d), %.2lf", (int)ship.field_pos.x, (int)ship.field_pos.y, ship.speed);
+	DrawText(position_buf, SCREEN_CENTER_X + 20, SCREEN_CENTER_Y, 26, LIGHTGRAY);
 }
 
 //------------------------------------------------------------------------------------
@@ -168,17 +146,17 @@ int main(void) {
     //--------------------------------------------------------------------------------------
 
     Ship ship = {
-	.dir = 0,
-	.field_pos = (Vector2){(float)fieldWidth / 2.0, (float)fieldHeight / 2.0},
-	.speed = 0.0,
-	.is_engine_working = false,
+		.dir = (Vector2){1, 0},
+		.field_pos = (Vector2){(float)fieldWidth / 2.0, (float)fieldHeight / 2.0},
+		.speed = 0.0,
+		.is_engine_working = false,
     };
 
     size_t healths_size = 3;
     Health healths[] = {
-	{.pos = (Vector2){400, 400}},
-	{.pos = (Vector2){700, 700}},
-	{.pos = (Vector2){900, 900}},
+		{.pos = (Vector2){400, 400}},
+		{.pos = (Vector2){700, 700}},
+		{.pos = (Vector2){900, 900}},
     };
 
     size_t shots_size = 0;
@@ -186,133 +164,109 @@ int main(void) {
 
     // Main game loop
     while (!WindowShouldClose()) {
-	if (IsKeyPressed(KEY_SPACE)) {
-	    if (shots_size < SHOTS_MAX_LEN) {
-		Shot shot;
-		shot.dir = ship.dir;
-		shot.pos = ship.field_pos;
+		ship.is_engine_working = false; // skip engine working
 
-		shots[shots_size++] = shot;
-	    }
-	}
+		if (IsKeyPressed(KEY_SPACE)) {
+			if (shots_size < SHOTS_MAX_LEN) {
+				Shot shot;
+				shot.dir = ship.dir;
+				shot.pos = ship.field_pos;
 
-	if (IsKeyDown(KEY_LEFT)) {
-	    ship.dir = fmod(ship.dir + 0.1, 2 * PI);
-	}
+				shots[shots_size++] = shot;
+			}
+		}
 
-	if (IsKeyDown(KEY_RIGHT)) {
-	    if (ship.dir > 0.1) {
-		ship.dir = fmod(ship.dir - 0.1, 2 * PI);
-	    } else {
-		ship.dir = 2 * PI;
-	    }
-	}
+		if (IsKeyDown(KEY_LEFT)) {
+			ship.dir = Vector2Rotate(ship.dir, -ROTATION_SPEED);
+		}
 
-	if (IsKeyDown(KEY_UP)) {
-	    if (ship.speed < 6) {
-		ship.speed += 0.2;
-	    }
-	    ship.is_engine_working = true;
-	}
+		if (IsKeyDown(KEY_RIGHT)) {
+			ship.dir = Vector2Rotate(ship.dir, ROTATION_SPEED);
+		}
 
-	if (IsKeyDown(KEY_DOWN)) {
-	    if (ship.speed > -6) {
-		ship.speed -= 0.2;
-	    }
-	    ship.is_engine_working = true;
-	}
+		if (IsKeyDown(KEY_UP)) {
+			if (ship.speed < MAX_SPEED) {
+				ship.speed += 0.2;
+			}
+			ship.is_engine_working = true;
+		}
 
-	if (ship.speed > 0.0) {
-	    float x = ship.field_pos.x + cosf(ship.dir) * ship.speed;
-	    float y = ship.field_pos.y - sinf(ship.dir) * ship.speed;
+		if (IsKeyDown(KEY_DOWN)) {
+			if (ship.speed > -MAX_SPEED) {
+				ship.speed -= 0.2;
+			}
+			ship.is_engine_working = true;
+		}
 
-	    if (0 <= x && x <= fieldWidth) {
-		ship.field_pos.x = x;
-	    }
+		if (ship.speed > 0) {
+			Vector2 new_pos = Vector2Add(ship.field_pos, Vector2Scale(ship.dir, ship.speed));
 
-	    if (0 <= y && y <= fieldHeight) {
-		ship.field_pos.y = y;
-	    }
+			if (0 <= new_pos.x && new_pos.x < fieldWidth) {
+				ship.field_pos.x = new_pos.x;
+			}
 
-	    if (ship.speed > 0.07) {
-		ship.speed -= 0.07;
-	    } else {
-		ship.speed = 0.0;
-	    }
-	}
+			if (0 <= new_pos.y && new_pos.y < fieldHeight) {
+				ship.field_pos.y = new_pos.y;
+			}
 
-	if (ship.speed < 0.0) {
-	    float x = ship.field_pos.x + cosf(ship.dir) * ship.speed;
-	    float y = ship.field_pos.y - sinf(ship.dir) * ship.speed;
+			if (ship.speed > 0.07) {
+				ship.speed -= 0.07;
+			} else {
+				ship.speed = 0.0;
+			}
+		}
 
-	    if (0 <= x && x <= fieldWidth) {
-		ship.field_pos.x = x;
-	    }
+		if (ship.speed < 0) {
+			ship.field_pos = Vector2Add(ship.field_pos, Vector2Scale(ship.dir, ship.speed));
 
-	    if (0 <= y && y <= fieldHeight) {
-		ship.field_pos.y = y;
-	    }
+			if (ship.speed < 0.07) {
+				ship.speed += 0.07;
+			} else {
+				ship.speed = 0.0;
+			}
+		}
 
-	    if (ship.speed < 0.07) {
-		ship.speed += 0.07;
-	    } else {
-		ship.speed = 0.0;
-	    }
-	}
+		// shots
+		for(size_t i = 0; i < shots_size; i++) {
+			Shot shot = shots[i];
+			Vector2 shot_speed = Vector2Scale(shot.dir, 15);
+			shot.pos = Vector2Add(shot.pos, shot_speed);
 
-	// shots
-	for(size_t i = 0; i < shots_size; i++) {
-	    Shot shot = shots[i];
+			if (0 <= shot.pos.x && shot.pos.x <= fieldWidth && 0 <= shot.pos.y && shot.pos.y <= fieldHeight) {
+				shots[i] = shot;
+			} else {
+				memcpy(&shots[i], &shots[i+1], sizeof(Shot) * (shots_size - i - 1));
+				shots_size -= 1;
+			}
+		}
 
-	    shot.pos.x += cosf(shot.dir) * 2;
-	    shot.pos.y -= sinf(shot.dir) * 2;
+		// Draw
+		//----------------------------------------------------------------------------------
+		BeginDrawing();
+		ClearBackground(DARKGRAY);
 
-	    if (0 <= shot.pos.x && shot.pos.x <= fieldWidth &&
-		0 <= shot.pos.y && shot.pos.y <= fieldHeight) {
-		shots[i] = shot;
-	    } else {
-		memcpy(&shots[i], &shots[i+1], sizeof(Shot) * (shots_size - i - 1));
-		shots_size -= 1;
-	    }
-	}
+		draw_net(ship);
+		draw_ship(ship);
+		draw_healths(ship, healths, healths_size);
 
-	// Draw
-	//----------------------------------------------------------------------------------
-	BeginDrawing();
-	ClearBackground(DARKGRAY);
+		for(size_t i = 0; i < shots_size; i++) {
+			Shot shot = shots[i];
 
-	draw_net(ship);
-	draw_ship(ship);
-	draw_healths(ship, healths, healths_size);
+			float x = ship.field_pos.x - shot.pos.x;
+			float y = ship.field_pos.y - shot.pos.y;
 
-	for(size_t i = 0; i < shots_size; i++) {
-	    Shot shot = shots[i];
+			Vector2 shot_point;
+			shot_point.x = SCREEN_CENTER_X - x;
+			shot_point.y = SCREEN_CENTER_Y - y;
 
-            float x = ship.field_pos.x - shot.pos.x;
-	    float y = ship.field_pos.y - shot.pos.y;
+			DrawCircleV(shot_point, 5, BLUE);
+		}
 
-            if (fabs(x) < SCREEN_CENTER_X && fabs(y) < SCREEN_CENTER_Y) {
-		float x2 = x + cosf(shot.dir) * 20;
-		float y2 = y - sinf(shot.dir) * 20;
-
-		DrawLine(SCREEN_CENTER_X - x, SCREEN_CENTER_Y - y,
-			 SCREEN_CENTER_X - x2, SCREEN_CENTER_Y - y2, BLUE);
-	    }
-	}
-
-	// --------------
-
-	// Ship position info
-	char position_buf[26];
-	sprintf(position_buf, "(%d; %d), %.2f, %.2f", (int)ship.field_pos.x,
-		(int)ship.field_pos.y, ship.speed, ship.dir);
-	DrawText(position_buf, SCREEN_CENTER_X + 20, SCREEN_CENTER_Y, 26,
-		 LIGHTGRAY);
-	//
-	EndDrawing();
-	//----------------------------------------------------------------------------------
-
-	ship.is_engine_working = false;
+		// --------------
+		draw_info(ship);
+		
+		EndDrawing();
+		//----------------------------------------------------------------------------------
     }
 
     // De-Initialization
