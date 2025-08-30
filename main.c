@@ -4,8 +4,11 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <stdint.h>
 
-#define SHOTS_MAX_LEN 5
+#define MAX_SHOTS 5
 
 #define SCREEN_WIDTH 1600
 #define SCREEN_HEIGHT 900
@@ -26,7 +29,13 @@ typedef struct {
 typedef struct {
     Vector2 pos;
     Vector2 dir;
+    bool visible;
 } Shot;
+
+typedef struct {
+	uint32_t len;
+	Shot shots[MAX_SHOTS];
+} AllShots;
 
 typedef struct {
     Vector2 pos;
@@ -36,8 +45,8 @@ const float SCREEN_CENTER_X = SCREEN_WIDTH / 2.0;
 const float SCREEN_CENTER_Y = SCREEN_HEIGHT / 2.0;
 
 Vector2 screen_center_v = {
-	.x = SCREEN_CENTER_X,
-	.y = SCREEN_CENTER_Y
+    .x = SCREEN_CENTER_X,
+    .y = SCREEN_CENTER_Y
 };
 
 int net_gap = 100;
@@ -76,7 +85,7 @@ void draw_net(Ship ship) {
     if (fieldHeight - ship.field_pos.y < SCREEN_CENTER_Y) {
 		int gap = SCREEN_CENTER_Y - (fieldHeight - ship.field_pos.y);
 		int y = SCREEN_HEIGHT - gap;
-		DrawLine(0, y, SCREEN_WIDTH, y, RED);
+			DrawLine(0, y, SCREEN_WIDTH, y, RED);
     }
 
     if (ship.field_pos.x < SCREEN_CENTER_X) {
@@ -92,44 +101,80 @@ void draw_net(Ship ship) {
 }
 
 void draw_ship(Ship ship) {
-	Vector2 ship_size = Vector2Scale(ship.dir, 15);
+    Vector2 ship_size = Vector2Scale(ship.dir, 15);
 
-	Vector2 v1 = Vector2Add(screen_center_v, ship_size);
+    Vector2 v1 = Vector2Add(screen_center_v, ship_size);
 
-	float l = (3 * PI) / 4;
-	Vector2 v2 = Vector2Add(screen_center_v, Vector2Rotate(ship_size, l));
+    float l = (3 * PI) / 4;
+    Vector2 v2 = Vector2Add(screen_center_v, Vector2Rotate(ship_size, l));
 
-	float r = (5 * PI) / 4;
-	Vector2 v3 = Vector2Add(screen_center_v, Vector2Rotate(ship_size, r));
+    float r = (5 * PI) / 4;
+    Vector2 v3 = Vector2Add(screen_center_v, Vector2Rotate(ship_size, r));
 
-	DrawTriangleLines(v1, v2, v3, WHITE);
+    DrawTriangleLines(v1, v2, v3, WHITE);
 
     if (ship.is_engine_working) {
-		for (int i = 0; i < 4; i++) {
-			Vector2 ve1 = Vector2Add(v2, Vector2Scale(ship.dir, -5 * i));
-			Vector2 ve2 = Vector2Add(v3, Vector2Scale(ship.dir, -5 * i));
-			DrawLineV(ve1, ve2, RED);
-		}
+	for (int i = 0; i < 4; i++) {
+	    Vector2 ve1 = Vector2Add(v2, Vector2Scale(ship.dir, -5 * i));
+	    Vector2 ve2 = Vector2Add(v3, Vector2Scale(ship.dir, -5 * i));
+	    DrawLineV(ve1, ve2, RED);
+	}
     }
 }
 
 void draw_healths(Ship ship, Health *healths, size_t healths_size) {
     for (int i = 0; i < healths_size; i++) {
-		Health h = healths[i];
-		float x = ship.field_pos.x - h.pos.x;
-		float y = ship.field_pos.y - h.pos.y;
-		float radius = 26.0;
-		if (fabs(x) - radius < SCREEN_CENTER_X &&
-			fabs(y) - radius < SCREEN_CENTER_Y) {
-			DrawCircle(SCREEN_CENTER_X - x, SCREEN_CENTER_Y - y, radius, RED);
-		}
+	Health h = healths[i];
+	float x = ship.field_pos.x - h.pos.x;
+	float y = ship.field_pos.y - h.pos.y;
+	float radius = 26.0;
+	if (fabs(x) - radius < SCREEN_CENTER_X &&
+	    fabs(y) - radius < SCREEN_CENTER_Y) {
+	    DrawCircle(SCREEN_CENTER_X - x, SCREEN_CENTER_Y - y, radius, RED);
+	}
     }
 }
 
-void draw_info(Ship ship) {
-	char position_buf[26];
-	sprintf(position_buf, "(%d; %d), %.2lf", (int)ship.field_pos.x, (int)ship.field_pos.y, ship.speed);
-	DrawText(position_buf, SCREEN_CENTER_X + 20, SCREEN_CENTER_Y, 26, LIGHTGRAY);
+#define INFO_TEXT_SIZE 26
+
+void draw_info(Ship* ship, AllShots* shots) {
+	{
+		char buf[26] = {0};
+		sprintf(buf, "(%d; %d), %.2lf", (int)ship->field_pos.x, (int)ship->field_pos.y, ship->speed);
+		DrawText(buf, SCREEN_CENTER_X + 20, SCREEN_CENTER_Y, INFO_TEXT_SIZE, LIGHTGRAY);
+	}
+	
+	{
+		char buf[128] = {0};
+		snprintf(buf, 128, "shots %d", shots->len);
+		DrawText(buf, 10, SCREEN_CENTER_Y, INFO_TEXT_SIZE, LIGHTGRAY);
+	}
+}
+
+Ship create_ship() {
+	Ship ship = {
+		.dir = (Vector2){1, 0},
+		.field_pos = (Vector2){(float)fieldWidth / 2.0, (float)fieldHeight / 2.0},
+		.speed = 0.0,
+		.is_engine_working = false,
+    };
+	return ship;
+}
+
+void draw_shots(Ship* ship, AllShots* shots) {
+	for(size_t i = 0; i < MAX_SHOTS; i++) {
+		Shot shot = shots->shots[i];
+		if (shot.visible) {
+			float x = ship->field_pos.x - shot.pos.x;
+			float y = ship->field_pos.y - shot.pos.y;
+
+			Vector2 shot_point;
+			shot_point.x = SCREEN_CENTER_X - x;
+			shot_point.y = SCREEN_CENTER_Y - y;
+
+			DrawCircleV(shot_point, 5, RED);
+		}
+	}
 }
 
 //------------------------------------------------------------------------------------
@@ -145,34 +190,35 @@ int main(void) {
     SetTargetFPS(60); // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
 
-    Ship ship = {
-		.dir = (Vector2){1, 0},
-		.field_pos = (Vector2){(float)fieldWidth / 2.0, (float)fieldHeight / 2.0},
-		.speed = 0.0,
-		.is_engine_working = false,
-    };
+    Ship ship = create_ship();
 
-    size_t healths_size = 3;
-    Health healths[] = {
-		{.pos = (Vector2){400, 400}},
-		{.pos = (Vector2){700, 700}},
-		{.pos = (Vector2){900, 900}},
-    };
+    // size_t healths_size = 3;
+    // Health healths[] = {
+	// 	{.pos = (Vector2){400, 400}},
+	// 	{.pos = (Vector2){700, 700}},
+	// 	{.pos = (Vector2){900, 900}},
+    // };
 
-    size_t shots_size = 0;
-    Shot shots[SHOTS_MAX_LEN];
+	AllShots shots = {0};
 
     // Main game loop
     while (!WindowShouldClose()) {
-		ship.is_engine_working = false; // skip engine working
+		ship.is_engine_working = false;
 
 		if (IsKeyPressed(KEY_SPACE)) {
-			if (shots_size < SHOTS_MAX_LEN) {
-				Shot shot;
-				shot.dir = ship.dir;
-				shot.pos = ship.field_pos;
-
-				shots[shots_size++] = shot;
+			if (shots.len < MAX_SHOTS) {
+				for (size_t i = 0; i < MAX_SHOTS; i++) {
+					if (!shots.shots[i].visible) {
+						Shot shot = {
+							.dir = ship.dir,
+							.pos = ship.field_pos,
+							.visible = true,
+						};
+						shots.shots[i] = shot;
+						shots.len++;
+						break;
+					}
+				}
 			}
 		}
 
@@ -226,17 +272,18 @@ int main(void) {
 			}
 		}
 
-		// shots
-		for(size_t i = 0; i < shots_size; i++) {
-			Shot shot = shots[i];
-			Vector2 shot_speed = Vector2Scale(shot.dir, 15);
-			shot.pos = Vector2Add(shot.pos, shot_speed);
-
-			if (0 <= shot.pos.x && shot.pos.x <= fieldWidth && 0 <= shot.pos.y && shot.pos.y <= fieldHeight) {
-				shots[i] = shot;
-			} else {
-				memcpy(&shots[i], &shots[i+1], sizeof(Shot) * (shots_size - i - 1));
-				shots_size -= 1;
+		// Shots
+		for (size_t i = 0; i < MAX_SHOTS; i++) {
+			Shot shot = shots.shots[i];
+			if (shot.visible) {
+				if (0 <= shot.pos.x && shot.pos.x <= fieldWidth && 0 <= shot.pos.y && shot.pos.y <= fieldHeight) {
+					Vector2 shot_speed = Vector2Scale(shot.dir, 15);
+					shot.pos = Vector2Add(shot.pos, shot_speed);
+					shots.shots[i] = shot;
+				} else {
+					shots.shots[i].visible = false;
+					shots.len--;
+				}
 			}
 		}
 
@@ -247,23 +294,12 @@ int main(void) {
 
 		draw_net(ship);
 		draw_ship(ship);
-		draw_healths(ship, healths, healths_size);
+		// draw_healths(ship, healths, healths_size);
 
-		for(size_t i = 0; i < shots_size; i++) {
-			Shot shot = shots[i];
-
-			float x = ship.field_pos.x - shot.pos.x;
-			float y = ship.field_pos.y - shot.pos.y;
-
-			Vector2 shot_point;
-			shot_point.x = SCREEN_CENTER_X - x;
-			shot_point.y = SCREEN_CENTER_Y - y;
-
-			DrawCircleV(shot_point, 5, BLUE);
-		}
+		draw_shots(&ship, &shots);
 
 		// --------------
-		draw_info(ship);
+		draw_info(&ship, &shots);
 		
 		EndDrawing();
 		//----------------------------------------------------------------------------------
