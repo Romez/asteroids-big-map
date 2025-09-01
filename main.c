@@ -9,7 +9,7 @@
 #include <stdint.h>
 #include <assert.h>
 
-#define MAX_SHOTS 5
+#define MAX_SHOTS 10
 
 #define INIT_SCREEN_WIDTH 1600
 #define INIT_SCREEN_HEIGHT 900
@@ -20,6 +20,16 @@ const float MAX_SPEED = 6;
 
 int fieldWidth = 2000;
 int fieldHeight = 2000;
+
+enum turn {
+	LEFT,
+	RIGHT,
+};
+
+enum move {
+	FORWARD,
+	BACKWARD,
+};
 
 typedef struct {
     Vector2 dir;
@@ -45,15 +55,7 @@ typedef struct {
 	Vector2 center;
 } Screen;
 
-// const float SCREEN_CENTER_X = SCREEN_WIDTH / 2.0;
-// const float SCREEN_CENTER_Y = SCREEN_HEIGHT / 2.0;
-
 int net_gap = 100;
-
-// Vector2 screen_center_v = {
-//     .x = SCREEN_CENTER_X,
-//     .y = SCREEN_CENTER_Y
-// };
 
 Ship create_ship() {
 	Ship ship = {
@@ -69,22 +71,22 @@ void draw_net(Screen* screen, Ship* ship) {
     // Net vertical
     int startX = -fmod(ship->field_pos.x, net_gap);
 
-    int finishX = screen->w; // SCREEN_WIDTH;
+    int finishX = screen->w;
 
     for (int i = startX; i < finishX; i += net_gap) {
 		int y1 = 0;
-		int y2 = screen->h;// SCREEN_HEIGHT;
+		int y2 = screen->h;
 		DrawLine(i, y1, i, y2, LIME);
     }
 
     int startY = -fmod(ship->field_pos.y, net_gap);
 
-    int finishY = screen->h;// SCREEN_HEIGHT;
+    int finishY = screen->h;
 
     // Net horizontal
     for (int i = startY; i < finishY; i += net_gap) {
 		int x1 = 0;
-		int x2 = screen->w;// SCREEN_WIDTH;
+		int x2 = screen->w;
 
 		DrawLine(x1, i, x2, i, LIME);
     }
@@ -99,7 +101,7 @@ void draw_net(Screen* screen, Ship* ship) {
     if (fieldHeight - ship->field_pos.y < screen->center.y) {
 		int gap = screen->center.y - (fieldHeight - ship->field_pos.y);
 		int y = screen->h - gap;
-			DrawLine(0, y, screen->w, y, RED);
+		DrawLine(0, y, screen->w, y, RED);
     }
 
     if (ship->field_pos.x < screen->center.x) {
@@ -166,9 +168,106 @@ void draw_shots(Screen* screen, Ship* ship, AllShots* shots) {
 	}
 }
 
-//------------------------------------------------------------------------------------
-// Program main entry point
-//------------------------------------------------------------------------------------
+Screen init_screen(int w, int h) {
+	return (Screen){
+		.w = w,
+		.h = h,
+		.center = (Vector2) {
+			.x = w / 2.0,
+			.y = h / 2.0,
+		},
+	};
+}
+
+void rotate_ship(Ship* ship, enum turn t) {
+	ship->dir = Vector2Rotate(ship->dir, t == LEFT ? -ROTATION_SPEED : ROTATION_SPEED);
+}
+
+void move_ship(Ship* ship, enum move m) {
+	if (m == FORWARD) {
+		if (ship->speed < MAX_SPEED) {
+			ship->speed += 0.2;
+		}
+		ship->is_engine_working = true;
+	} else if (m == BACKWARD) {
+		if (ship->speed > -MAX_SPEED) {
+			ship->speed -= 0.2;
+		}
+		ship->is_engine_working = true;
+	} else {
+		assert(NULL && "Unexpected move type");
+	}
+}
+
+void slowdown_ship(Ship* ship) {
+	if (ship->speed != 0) {
+		Vector2 new_pos = Vector2Add(ship->field_pos, Vector2Scale(ship->dir, ship->speed));
+
+		if (0 <= new_pos.x && new_pos.x < fieldWidth) {
+			ship->field_pos.x = new_pos.x;
+		}
+
+		if (0 <= new_pos.y && new_pos.y < fieldHeight) {
+			ship->field_pos.y = new_pos.y;
+		}
+
+		if (ship->speed > 0) {
+			if (ship->speed > 0.07) {
+				ship->speed -= 0.07;
+			} else {
+				ship->speed = 0.0;
+			}
+		}
+
+		if (ship->speed < 0) {
+			if (ship->speed < 0.07) {
+				ship->speed += 0.07;
+			} else {
+				ship->speed = 0.0;
+			}
+		}
+	}
+}
+
+void add_shot(AllShots* shots, Ship* ship) {
+	if (shots->len < MAX_SHOTS) {
+		for (size_t i = 0; i < MAX_SHOTS; i++) {
+			if (!shots->shots[i].visible) {
+				Shot shot = {
+					.dir = ship->dir,
+					.pos = ship->field_pos,
+					.visible = true,
+				};
+				shots->shots[i] = shot;
+				shots->len++;
+				break;
+			}
+		}
+	}
+}
+
+bool is_shot_on_field(Shot* shot) {
+	float x = shot->pos.x;
+	float y = shot->pos.y;
+	return 0 <= x && x <= fieldWidth && 0 <= y && y <= fieldHeight;
+}
+
+void move_shots(AllShots* shots) {
+	for (size_t i = 0; i < MAX_SHOTS; i++) {
+		Shot shot = shots->shots[i];
+		if (shot.visible) {
+			if (is_shot_on_field(&shot)) {
+				Vector2 shot_speed = Vector2Scale(shot.dir, 15);
+				shot.pos = Vector2Add(shot.pos, shot_speed);
+				shots->shots[i] = shot;
+			} else {
+				shots->shots[i].visible = false;
+				shots->len--;
+			}
+		}
+	}
+}
+
 int main(void) {
     // Initialization
     //--------------------------------------------------------------------------------------
@@ -183,111 +282,39 @@ int main(void) {
 
 	AllShots shots = {0};
 
-	Screen screen = {
-		.w = GetScreenWidth(),
-		.h = GetScreenHeight(),
-		.center = (Vector2) {
-			.x = GetScreenWidth() / 2.0,
-			.y = GetScreenHeight() / 2.0,
-		},
-	};
+	Screen screen = init_screen(GetScreenWidth(), GetScreenHeight());
 
     // Main game loop
     while (!WindowShouldClose()) {
 		if (IsWindowResized()) {
-			screen = (Screen){
-				.w = GetScreenWidth(),
-				.h = GetScreenHeight(),
-				.center = (Vector2) {
-					.x = GetScreenWidth() / 2.0,
-					.y = GetScreenHeight() / 2.0,
-				},
-			};
+			screen = init_screen(GetScreenWidth(), GetScreenHeight());
 		}
 
 		ship.is_engine_working = false;
 
 		if (IsKeyPressed(KEY_SPACE)) {
-			if (shots.len < MAX_SHOTS) {
-				for (size_t i = 0; i < MAX_SHOTS; i++) {
-					if (!shots.shots[i].visible) {
-						Shot shot = {
-							.dir = ship.dir,
-							.pos = ship.field_pos,
-							.visible = true,
-						};
-						shots.shots[i] = shot;
-						shots.len++;
-						break;
-					}
-				}
-			}
+			add_shot(&shots, &ship);
 		}
 
 		if (IsKeyDown(KEY_LEFT)) {
-			ship.dir = Vector2Rotate(ship.dir, -ROTATION_SPEED);
+			rotate_ship(&ship, LEFT);
 		}
 
 		if (IsKeyDown(KEY_RIGHT)) {
-			ship.dir = Vector2Rotate(ship.dir, ROTATION_SPEED);
+			rotate_ship(&ship, RIGHT);
 		}
 
 		if (IsKeyDown(KEY_UP)) {
-			if (ship.speed < MAX_SPEED) {
-				ship.speed += 0.2;
-			}
-			ship.is_engine_working = true;
+			move_ship(&ship, FORWARD);
 		}
 
 		if (IsKeyDown(KEY_DOWN)) {
-			if (ship.speed > -MAX_SPEED) {
-				ship.speed -= 0.2;
-			}
-			ship.is_engine_working = true;
+			move_ship(&ship, BACKWARD);
 		}
 
-		if (ship.speed > 0) {
-			Vector2 new_pos = Vector2Add(ship.field_pos, Vector2Scale(ship.dir, ship.speed));
+		slowdown_ship(&ship);
 
-			if (0 <= new_pos.x && new_pos.x < fieldWidth) {
-				ship.field_pos.x = new_pos.x;
-			}
-
-			if (0 <= new_pos.y && new_pos.y < fieldHeight) {
-				ship.field_pos.y = new_pos.y;
-			}
-
-			if (ship.speed > 0.07) {
-				ship.speed -= 0.07;
-			} else {
-				ship.speed = 0.0;
-			}
-		}
-
-		if (ship.speed < 0) {
-			ship.field_pos = Vector2Add(ship.field_pos, Vector2Scale(ship.dir, ship.speed));
-
-			if (ship.speed < 0.07) {
-				ship.speed += 0.07;
-			} else {
-				ship.speed = 0.0;
-			}
-		}
-
-		// Shots
-		for (size_t i = 0; i < MAX_SHOTS; i++) {
-			Shot shot = shots.shots[i];
-			if (shot.visible) {
-				if (0 <= shot.pos.x && shot.pos.x <= fieldWidth && 0 <= shot.pos.y && shot.pos.y <= fieldHeight) {
-					Vector2 shot_speed = Vector2Scale(shot.dir, 15);
-					shot.pos = Vector2Add(shot.pos, shot_speed);
-					shots.shots[i] = shot;
-				} else {
-					shots.shots[i].visible = false;
-					shots.len--;
-				}
-			}
-		}
+		move_shots(&shots);
 
 		// Draw
 		//----------------------------------------------------------------------------------
