@@ -15,6 +15,8 @@
 #define INIT_SCREEN_HEIGHT 900
 #define INFO_TEXT_SIZE 26
 
+#define SIGHT_COLOR RED
+
 const float ROTATION_SPEED = PI / 32;
 const float MAX_SPEED = 6;
 
@@ -229,12 +231,16 @@ void slowdown_ship(Ship* ship) {
 	}
 }
 
-void add_shot(AllShots* shots, Ship* ship) {
+void add_shot(Screen* screen, AllShots* shots, Ship* ship, Vector2 sight) {
 	if (shots->len < MAX_SHOTS) {
 		for (size_t i = 0; i < MAX_SHOTS; i++) {
 			if (!shots->shots[i].visible) {
+				Vector2 dir = (Vector2) {
+					.x = sight.x - screen->center.x,
+					.y = sight.y - screen->center.y,
+				};
 				Shot shot = {
-					.dir = ship->dir,
+					.dir = Vector2Scale(Vector2Normalize(dir), 1),
 					.pos = ship->field_pos,
 					.visible = true,
 				};
@@ -268,6 +274,13 @@ void move_shots(AllShots* shots) {
 	}
 }
 
+void draw_sight(Vector2 sight) {
+	DrawLine(sight.x, sight.y - 50, sight.x, sight.y - 10, SIGHT_COLOR); // top
+	DrawLine(sight.x + 10, sight.y, sight.x + 50, sight.y, SIGHT_COLOR); // right
+	DrawLine(sight.x, sight.y + 10, sight.x, sight.y + 50, SIGHT_COLOR); // top
+	DrawLine(sight.x - 50, sight.y, sight.x - 10, sight.y, SIGHT_COLOR); // left
+}
+
 int main(void) {
     // Initialization
     //--------------------------------------------------------------------------------------
@@ -275,7 +288,9 @@ int main(void) {
 
     InitWindow(INIT_SCREEN_WIDTH, INIT_SCREEN_HEIGHT, "Asteroids");
 
-    SetTargetFPS(60); // Set our game to run at 60 frames-per-second
+    SetTargetFPS(60);
+
+	DisableCursor(); 
     //--------------------------------------------------------------------------------------
 
     Ship ship = create_ship();
@@ -284,31 +299,47 @@ int main(void) {
 
 	Screen screen = init_screen(GetScreenWidth(), GetScreenHeight());
 
+	Vector2 sight = {0, 0};
+
     // Main game loop
     while (!WindowShouldClose()) {
 		if (IsWindowResized()) {
 			screen = init_screen(GetScreenWidth(), GetScreenHeight());
 		}
 
+		if (IsCursorOnScreen()) {
+			if (!IsCursorHidden()) {
+				HideCursor();
+			}
+			sight.x = GetMouseX();
+			sight.y = GetMouseY();
+		} else {
+			if (IsCursorHidden()) {
+				ShowCursor();
+				sight.x = -50;
+			}
+		} 
+		
+
 		ship.is_engine_working = false;
 
-		if (IsKeyPressed(KEY_SPACE)) {
-			add_shot(&shots, &ship);
+		if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+			add_shot(&screen, &shots, &ship, sight);
 		}
 
-		if (IsKeyDown(KEY_LEFT)) {
+		if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
 			rotate_ship(&ship, LEFT);
 		}
 
-		if (IsKeyDown(KEY_RIGHT)) {
+		if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
 			rotate_ship(&ship, RIGHT);
 		}
 
-		if (IsKeyDown(KEY_UP)) {
+		if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
 			move_ship(&ship, FORWARD);
 		}
 
-		if (IsKeyDown(KEY_DOWN)) {
+		if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
 			move_ship(&ship, BACKWARD);
 		}
 
@@ -320,6 +351,8 @@ int main(void) {
 		//----------------------------------------------------------------------------------
 		BeginDrawing();
 		ClearBackground(DARKGRAY);
+
+		draw_sight(sight);
 
 		draw_net(&screen, &ship);
 		draw_ship(&screen, &ship);
