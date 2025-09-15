@@ -275,10 +275,12 @@ void move_shots(AllShots* shots) {
 }
 
 void draw_sight(Vector2 sight) {
-	DrawLine(sight.x, sight.y - 50, sight.x, sight.y - 10, SIGHT_COLOR); // top
-	DrawLine(sight.x + 10, sight.y, sight.x + 50, sight.y, SIGHT_COLOR); // right
-	DrawLine(sight.x, sight.y + 10, sight.x, sight.y + 50, SIGHT_COLOR); // top
-	DrawLine(sight.x - 50, sight.y, sight.x - 10, sight.y, SIGHT_COLOR); // left
+	int gap = 10;
+
+	DrawRectangle(sight.x, sight.y - 40, 2, 30, SIGHT_COLOR); // top
+	DrawRectangle(sight.x + gap, sight.y, 30, 2, SIGHT_COLOR); // right
+	DrawRectangle(sight.x, sight.y + gap, 2, 30, SIGHT_COLOR); // bottom
+	DrawRectangle(sight.x - 40, sight.y, 30, 2, SIGHT_COLOR); // left
 }
 
 int main(void) {
@@ -307,19 +309,7 @@ int main(void) {
 			screen = init_screen(GetScreenWidth(), GetScreenHeight());
 		}
 
-		if (IsCursorOnScreen()) {
-			if (!IsCursorHidden()) {
-				HideCursor();
-			}
-			sight.x = GetMouseX();
-			sight.y = GetMouseY();
-		} else {
-			if (IsCursorHidden()) {
-				ShowCursor();
-				sight.x = -50;
-			}
-		} 
-		
+		sight = GetMousePosition();
 
 		ship.is_engine_working = false;
 
@@ -352,12 +342,12 @@ int main(void) {
 		BeginDrawing();
 		ClearBackground(DARKGRAY);
 
-		draw_sight(sight);
-
 		draw_net(&screen, &ship);
 		draw_ship(&screen, &ship);
 
 		draw_shots(&screen, &ship, &shots);
+
+		draw_sight(sight);
 
 		// --------------
 		draw_info(&screen, &ship, &shots);
