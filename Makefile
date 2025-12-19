@@ -1,7 +1,7 @@
 .PHONY: clean
 
-asteroids: main.c
-	gcc -g -fsanitize=address -std=c2x -Wall -I./include main.c -o main ./lib/libraylib.a -lm
+asteroids: main.cpp
+	g++ -g -fsanitize=address -std=c++23 -Wall -I./include main.cpp -o main ./lib/libraylib.a -lm
 
 clear:
 	rm ./asteroids
