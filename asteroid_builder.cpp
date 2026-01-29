@@ -76,8 +76,13 @@ public:
 		polyCenter = centerPoint(points);
 	}
 
-	void rotatePointAt(size_t i, float rotationAngle) {
-		points[i] = Vector2Add(Vector2Rotate(Vector2Subtract(points[i], polyCenter), rotationAngle), polyCenter);
+	void rotatePointAt(size_t i) {
+        Vector2 p = points[i];
+        p = Vector2Subtract(p, polyCenter);
+        p = Vector2Rotate(p, rotationAngle);
+        p = Vector2Add(p, polyCenter);
+        
+		points[i] = p;
 	}
 
 	ssize_t getPointAtPosition(Vector2 pos) {
@@ -91,7 +96,7 @@ public:
 				return i;
 			}
 		}
-		
+
 		return -1;
 	}
 
@@ -130,12 +135,23 @@ void drawShape(Shape& shape) {
 		}
 }
 
+void drawPointCoords(Shape& shape) {
+    for (size_t i = 0; i < shape.points.size(); i++) {
+        int fontSize = 20;
+
+        Vector2 p = Vector2Subtract(screenCenter, shape.points[i]);
+        std::string text = std::format("Point {:d} {:.2f} {:.2f}", i, p.x, p.y);
+
+        DrawText(text.c_str(), 0, i * fontSize, fontSize, LIME);
+    }
+}
+
 int main() {		
 	InitWindow(screenWidth, screenHeight, "Polygon");
 
 	std::vector init_points = { 
-		Vector2{-80, 0},
-		Vector2{0, -20},
+		Vector2{-80.123, 0},
+		Vector2{0, -20.0},
 		Vector2{20, 0},
 		Vector2{0, 40},
 		Vector2{-20, 20},
@@ -179,7 +195,7 @@ int main() {
 
 		if (shape.isRotating) {
 			for (size_t i = 0; i < shape.points.size(); i++) {
-				shape.rotatePointAt(i, rotationAngle);
+				shape.rotatePointAt(i);
 			}
 		}
 
@@ -188,6 +204,8 @@ int main() {
 		ClearBackground(DARKBROWN);
 		
 		drawShape(shape);
+        
+        drawPointCoords(shape);
 
 		EndDrawing();
 	}
