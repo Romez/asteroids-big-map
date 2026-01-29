@@ -9,7 +9,7 @@
 int screenWidth = 1200;
 int screenHeight = 900;
 
-float rotationAngle = 0.001;
+float rotationAngle = 0.05;
 
 const Vector2 screenCenter = Vector2{
 	.x = screenWidth / 2.0f,
@@ -149,6 +149,8 @@ void drawPointCoords(Shape& shape) {
 int main() {		
 	InitWindow(screenWidth, screenHeight, "Polygon");
 
+    SetTargetFPS(60);
+
 	std::vector init_points = { 
 		Vector2{-80.123, 0},
 		Vector2{0, -20.0},
@@ -206,6 +208,8 @@ int main() {
 		drawShape(shape);
         
         drawPointCoords(shape);
+
+        // DrawFPS(200, 10);
 
 		EndDrawing();
 	}
