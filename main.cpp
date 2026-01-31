@@ -1,5 +1,6 @@
 #include "include/raylib.h"
 #include "include/raymath.h"
+#include <iostream>
 #include <assert.h>
 #include <math.h>
 #include <stdbool.h>
@@ -16,379 +17,438 @@
 #define INIT_SCREEN_HEIGHT 900
 #define INFO_TEXT_SIZE 26
 
-#define SIGHT_COLOR RED
-
 const float ROTATION_SPEED = PI / 32;
 const float MAX_SPEED = 6;
 
-int fieldWidth = 2000;
-int fieldHeight = 2000;
+const int NET_GAP = 100;
+
+const int fieldWidth = 2000;
+const int fieldHeight = 2000;
 
 enum turn {
-  LEFT,
-  RIGHT,
+	LEFT,
+	RIGHT,
 };
 
 enum move {
-  FORWARD,
-  BACKWARD,
+	FORWARD,
+	BACKWARD,
 };
 
-typedef struct {
-  Vector2 dir;
-  Vector2 field_pos;
-  float speed;
-  bool is_engine_working;
-} Ship;
+struct Ship {
+	Vector2 dir = (Vector2){ 1, 0 };;
+	Vector2 pos = (Vector2){ fieldWidth / 2.0f, fieldHeight / 2.0f };
+	float speed = 0;
+	bool is_engine_working = false;
 
-typedef struct {
-  Vector2 pos;
-  Vector2 dir;
-  bool visible;
-} Shot;
+	void rotate(enum turn t) {
+		dir = Vector2Rotate(dir, t == LEFT ? -ROTATION_SPEED : ROTATION_SPEED);
+	}
 
-typedef struct {
-  uint32_t len;
-  Shot shots[MAX_SHOTS];
-} AllShots;
+	void move(enum move m) {
+		if (m == FORWARD) {
+			if (speed < MAX_SPEED) {
+				speed += 0.2;
+			}
+			is_engine_working = true;
+		}
+		else if (m == BACKWARD) {
+			if (speed > -MAX_SPEED) {
+				speed -= 0.2;
+			}
+			is_engine_working = true;
+		}
+		else {
+			assert(NULL && "Unexpected move type");
+		}
+	}
 
-typedef struct {
-  int w;
-  int h;
-  Vector2 center;
-} Screen;
+	void slowdown() {
+		if (speed != 0) {
+			Vector2 new_pos = Vector2Add(pos, Vector2Scale(dir, speed));
 
-int net_gap = 100;
+			if (0 <= new_pos.x && new_pos.x < fieldWidth) {
+				pos.x = new_pos.x;
+			}
 
-Ship create_ship() {
-  Ship ship = {
-      .dir = (Vector2){1, 0},
-      .field_pos = (Vector2){fieldWidth / 2.0f, fieldHeight / 2.0f},
-      .speed = 0.0,
-      .is_engine_working = false,
-  };
-  return ship;
+			if (0 <= new_pos.y && new_pos.y < fieldHeight) {
+				pos.y = new_pos.y;
+			}
+
+			if (speed > 0) {
+				if (speed > 0.07) {
+					speed -= 0.07;
+				}
+				else {
+					speed = 0.0;
+				}
+			}
+
+			if (speed < 0) {
+				if (speed < 0.07) {
+					speed += 0.07;
+				}
+				else {
+					speed = 0.0;
+				}
+			}
+		}
+	}
+};
+
+struct Shot {
+	Vector2 pos;
+	Vector2 dir;
+
+	bool isShotOnField() {
+		return 0 <= pos.x && pos.x <= fieldWidth && 0 <= pos.y && pos.y <= fieldHeight;
+	}
+
+	void move() {
+		Vector2 shot_speed = Vector2Scale(dir, 15);
+		pos = Vector2Add(pos, shot_speed);
+	}
+};
+
+struct Screen {
+	int w;
+	int h;
+	Vector2 center;
+};
+
+Vector2 centerPoint(std::vector<Vector2> vertices) {
+	float x = 0;
+	float y = 0;
+	float a = 0;
+
+	size_t n = vertices.size();
+
+	for (size_t i = 0; i < n; i++) {
+		float x1 = vertices[i].x;
+		float y1 = vertices[i].y;
+
+		float x2 = vertices[(i + 1) % n].x;
+		float y2 = vertices[(i + 1) % n].y;
+		
+		a += x1 * y2 - x2 * y1;
+
+		float cross = (x1 * y2 - x2 * y1);
+		x += (x1 + x2) * cross;
+		y += (y1 + y2) * cross;
+	}
+
+	x /= (3 * a);
+	y /= (3 * a);
+
+	return Vector2 {x, y};
 }
 
-void draw_net(Screen *screen, Ship *ship) {
-  // Net vertical
-  int startX = -fmod(ship->field_pos.x, net_gap);
+const float rotationAngle = 0.05;
 
-  int finishX = screen->w;
+struct Asteroid {
+	Vector2 pos;
+	Vector2 dir;
+	std::vector<Vector2> vertices;
+	Vector2 polyCenter;
 
-  for (int i = startX; i < finishX; i += net_gap) {
-    int y1 = 0;
-    int y2 = screen->h;
-    DrawLine(i, y1, i, y2, LIME);
-  }
+	Asteroid(Vector2 pos, Vector2 dir, std::vector<Vector2> vertices) : pos(pos), dir(dir), vertices(vertices) {
+		polyCenter = centerPoint(vertices);
+	}
 
-  int startY = -fmod(ship->field_pos.y, net_gap);
+	void rotate() {
+		for (size_t i = 0; i < vertices.size(); i++) {
+			Vector2 p = vertices[i];
+			p = Vector2Subtract(p, polyCenter);
+			p = Vector2Rotate(p, rotationAngle);
+			p = Vector2Add(p, polyCenter);
+			
+			vertices[i] = p;
+		}
+	}
 
-  int finishY = screen->h;
+	void move() {
+		pos = Vector2Add(pos, dir);
+	}
 
-  // Net horizontal
-  for (int i = startY; i < finishY; i += net_gap) {
-    int x1 = 0;
-    int x2 = screen->w;
+	bool isOnField(Screen& screen, Ship& ship) {
+		if (0 <= pos.x && pos.x <= fieldWidth && 0 <= pos.y && pos.y <= fieldHeight) {
+			return true;
+		}
 
-    DrawLine(x1, i, x2, i, LIME);
-  }
+		for (Vector2 vertex : vertices) {
+			Vector2 p = Vector2Add(pos, vertex);
+			if (0 <= p.x && p.x <= fieldWidth && 0 <= p.y && p.y <= fieldHeight) {
+				return true;
+			}
+		}
+		return false;
+	}
+};
 
-  // Border lines
+void drawNet(Screen& screen, Ship& ship) {
+	// Net vertical
+	int startX = -fmod(ship.pos.x, NET_GAP);
 
-  if (ship->field_pos.y < screen->center.y) {
-    int y = screen->center.y - ship->field_pos.y;
-    DrawLine(0, y, screen->w, y, RED);
-  }
+	int finishX = screen.w;
 
-  if (fieldHeight - ship->field_pos.y < screen->center.y) {
-    int gap = screen->center.y - (fieldHeight - ship->field_pos.y);
-    int y = screen->h - gap;
-    DrawLine(0, y, screen->w, y, RED);
-  }
+	for (int i = startX; i < finishX; i += NET_GAP) {
+		int y1 = 0;
+		int y2 = screen.h;
+		DrawLine(i, y1, i, y2, LIME);
+	}
 
-  if (ship->field_pos.x < screen->center.x) {
-    int x = screen->center.x - ship->field_pos.x;
-    DrawLine(x, 0, x, screen->h, RED);
-  }
+	int startY = -fmod(ship.pos.y, NET_GAP);
 
-  if (fieldWidth - ship->field_pos.x < screen->center.x) {
-    int gap = screen->center.x - (fieldWidth - ship->field_pos.x);
-    int x = screen->w - gap;
-    DrawLine(x, 0, x, screen->h, RED);
-  }
+	int finishY = screen.h;
+
+	// Net horizontal
+	for (int i = startY; i < finishY; i += NET_GAP) {
+		int x1 = 0;
+		int x2 = screen.w;
+
+		DrawLine(x1, i, x2, i, LIME);
+	}
+
+	// Border lines
+
+	if (ship.pos.y < screen.center.y) {
+		int y = screen.center.y - ship.pos.y;
+		DrawLine(0, y, screen.w, y, RED);
+	}
+
+	if (fieldHeight - ship.pos.y < screen.center.y) {
+		int gap = screen.center.y - (fieldHeight - ship.pos.y);
+		int y = screen.h - gap;
+		DrawLine(0, y, screen.w, y, RED);
+	}
+
+	if (ship.pos.x < screen.center.x) {
+		int x = screen.center.x - ship.pos.x;
+		DrawLine(x, 0, x, screen.h, RED);
+	}
+
+	if (fieldWidth - ship.pos.x < screen.center.x) {
+		int gap = screen.center.x - (fieldWidth - ship.pos.x);
+		int x = screen.w - gap;
+		DrawLine(x, 0, x, screen.h, RED);
+	}
 }
 
-void draw_ship(Screen *screen, Ship *ship) {
-  Vector2 ship_size = Vector2Scale(ship->dir, 15);
+void drawShip(Screen& screen, Ship& ship) {
+	Vector2 ship_size = Vector2Scale(ship.dir, 15);
 
-  Vector2 v1 = Vector2Add(screen->center, ship_size);
+	Vector2 v1 = Vector2Add(screen.center, ship_size);
 
-  float l = (3 * PI) / 4;
-  Vector2 v2 = Vector2Add(screen->center, Vector2Rotate(ship_size, l));
+	float l = (3 * PI) / 4;
+	Vector2 v2 = Vector2Add(screen.center, Vector2Rotate(ship_size, l));
 
-  float r = (5 * PI) / 4;
-  Vector2 v3 = Vector2Add(screen->center, Vector2Rotate(ship_size, r));
+	float r = (5 * PI) / 4;
+	Vector2 v3 = Vector2Add(screen.center, Vector2Rotate(ship_size, r));
 
-  DrawTriangleLines(v1, v2, v3, WHITE);
+	DrawTriangleLines(v1, v2, v3, WHITE);
 
-  if (ship->is_engine_working) {
-    for (int i = 0; i < 4; i++) {
-      Vector2 ve1 = Vector2Add(v2, Vector2Scale(ship->dir, -5 * i));
-      Vector2 ve2 = Vector2Add(v3, Vector2Scale(ship->dir, -5 * i));
-      DrawLineV(ve1, ve2, RED);
-    }
-  }
+	if (ship.is_engine_working) {
+		for (int i = 0; i < 4; i++) {
+			Vector2 ve1 = Vector2Add(v2, Vector2Scale(ship.dir, -5 * i));
+			Vector2 ve2 = Vector2Add(v3, Vector2Scale(ship.dir, -5 * i));
+			DrawLineV(ve1, ve2, RED);
+		}
+	}
 }
 
-void draw_info(Screen *screen, Ship *ship, AllShots *shots) {
-  {
-    char buf[26] = {0};
-    sprintf(buf, "(%d; %d), %.2lf", (int)ship->field_pos.x,
-            (int)ship->field_pos.y, ship->speed);
-    DrawText(buf, screen->center.x + 20, screen->center.y, INFO_TEXT_SIZE, LIGHTGRAY);
-  }
+void drawInfo(Screen& screen, Ship& ship, std::vector<Shot>& shots) {
+	{
+		char buf[26] = { 0 };
+		sprintf(buf, "(%d; %d), %.2lf", (int)ship.pos.x,
+			(int)ship.pos.y, ship.speed);
+		DrawText(buf, screen.center.x + 20, screen.center.y, INFO_TEXT_SIZE, LIGHTGRAY);
+	}
 
-  {
-    char buf[128] = {0};
-    snprintf(buf, 128, "shots %d", shots->len);
-    DrawText(buf, 10, screen->center.y, INFO_TEXT_SIZE, LIGHTGRAY);
-  }
+	{
+		char buf[128] = { 0 };
+		snprintf(buf, 128, "shots %ld", shots.size());
+		DrawText(buf, 10, screen.center.y, INFO_TEXT_SIZE, LIGHTGRAY);
+	}
 }
 
-Vector2 field_pos_to_screen_pos(Screen *screen, Ship *ship, Vector2 field_pos) {
-  float x = screen->center.x - (ship->field_pos.x - field_pos.x);
-  float y = screen->center.y - (ship->field_pos.y - field_pos.y);
-  return Vector2{x, y};
+Vector2 fieldPosToScreenPos(Screen& screen, Ship& ship, Vector2 field_pos) {
+	float x = screen.center.x - (ship.pos.x - field_pos.x);
+	float y = screen.center.y - (ship.pos.y - field_pos.y);
+	return Vector2{ x, y };
 }
 
-void draw_shots(Screen *screen, Ship *ship, AllShots *shots) {
-  for (size_t i = 0; i < MAX_SHOTS; i++) {
-    Shot shot = shots->shots[i];
-    if (shot.visible) {
-      Vector2 shot_point = field_pos_to_screen_pos(screen, ship, shot.pos);
-      DrawCircleV(shot_point, 5, RED);
-    }
-  }
+void drawShots(Screen& screen, Ship& ship, std::vector<Shot>& shots) {
+	for (size_t i = 0; i < shots.size(); i++) {
+		Shot shot = shots[i];
+
+		Vector2 shot_point = fieldPosToScreenPos(screen, ship, shot.pos);
+		DrawCircleV(shot_point, 5, RED);
+	}
 }
 
-Screen init_screen(int w, int h) {
-  return (Screen){
-	.w = w,
-	.h = h,
-	.center =
-	(Vector2){
-	  .x = w / 2.0f,
-	  .y = h / 2.0f,
-	},
-  };
+Screen initScreen(int w, int h) {
+	return (Screen) {
+		.w = w,
+			.h = h,
+			.center = (Vector2){
+				.x = w / 2.0f,
+				.y = h / 2.0f,
+		},
+	};
 }
 
-void rotate_ship(Ship *ship, enum turn t) {
-  ship->dir = Vector2Rotate(ship->dir, t == LEFT ? -ROTATION_SPEED : ROTATION_SPEED);
+void addShot(Screen& screen, std::vector<Shot>& shots, Ship& ship) {
+	if (shots.size() < MAX_SHOTS) {
+		Shot shot = {
+			.pos = ship.pos,
+			.dir = Vector2Scale(Vector2Normalize(ship.dir), 1),
+		};
+
+		shots.push_back(shot);
+	}
 }
 
-void move_ship(Ship *ship, enum move m) {
-  if (m == FORWARD) {
-    if (ship->speed < MAX_SPEED) {
-      ship->speed += 0.2;
-    }
-    ship->is_engine_working = true;
-  } else if (m == BACKWARD) {
-    if (ship->speed > -MAX_SPEED) {
-      ship->speed -= 0.2;
-    }
-    ship->is_engine_working = true;
-  } else {
-    assert(NULL && "Unexpected move type");
-  }
+void moveShots(std::vector<Shot>& shots) {
+	std::vector<size_t> to_remove;
+
+	for (size_t i = 0; i < shots.size(); i++) {
+		Shot& shot = shots[i];
+
+		if (shot.isShotOnField()) {
+			shot.move();
+		} else {
+			to_remove.push_back(i);
+		}
+	}
+
+	for (size_t i = to_remove.size(); i-- > 0; ) {
+		shots.erase(shots.begin() + to_remove[i]);
+	}
 }
 
-void slowdown_ship(Ship *ship) {
-  if (ship->speed != 0) {
-    Vector2 new_pos = Vector2Add(ship->field_pos, Vector2Scale(ship->dir, ship->speed));
+void drawAsteroid(Screen& screen, Ship& ship, Asteroid& asteroid) {
+	for (size_t i = 0; i < asteroid.vertices.size(); i++) {
+		Vector2 p = Vector2Add(asteroid.pos, asteroid.vertices[i]);
+		DrawCircleV(fieldPosToScreenPos(screen, ship, p), 3, LIME);
+	}
 
-    if (0 <= new_pos.x && new_pos.x < fieldWidth) {
-      ship->field_pos.x = new_pos.x;
-    }
-
-    if (0 <= new_pos.y && new_pos.y < fieldHeight) {
-      ship->field_pos.y = new_pos.y;
-    }
-
-    if (ship->speed > 0) {
-      if (ship->speed > 0.07) {
-        ship->speed -= 0.07;
-      } else {
-        ship->speed = 0.0;
-      }
-    }
-
-    if (ship->speed < 0) {
-      if (ship->speed < 0.07) {
-        ship->speed += 0.07;
-      } else {
-        ship->speed = 0.0;
-      }
-    }
-  }
+	for (size_t i = 1; i <= asteroid.vertices.size(); i++) {
+		Vector2 p1 = fieldPosToScreenPos(screen, ship, Vector2Add(asteroid.pos, asteroid.vertices[i - 1]));
+		Vector2 p2 = fieldPosToScreenPos(screen, ship, Vector2Add(asteroid.pos, asteroid.vertices[i % asteroid.vertices.size()]));
+		DrawLineV(p1, p2, WHITE);
+	}
 }
-
-void add_shot(Screen *screen, AllShots *shots, Ship *ship, Vector2 sight) {
-  if (shots->len < MAX_SHOTS) {
-    for (size_t i = 0; i < MAX_SHOTS; i++) {
-      if (!shots->shots[i].visible) {
-        Vector2 dir = (Vector2){
-            .x = sight.x - screen->center.x,
-            .y = sight.y - screen->center.y,
-        };
-        Shot shot = {
-            .pos = ship->field_pos,
-            .dir = Vector2Scale(Vector2Normalize(dir), 1),
-            .visible = true,
-        };
-        shots->shots[i] = shot;
-        shots->len++;
-        break;
-      }
-    }
-  }
-}
-
-bool is_shot_on_field(Shot *shot) {
-  float x = shot->pos.x;
-  float y = shot->pos.y;
-  return 0 <= x && x <= fieldWidth && 0 <= y && y <= fieldHeight;
-}
-
-void move_shots(AllShots *shots) {
-  for (size_t i = 0; i < MAX_SHOTS; i++) {
-    Shot shot = shots->shots[i];
-    if (shot.visible) {
-      if (is_shot_on_field(&shot)) {
-        Vector2 shot_speed = Vector2Scale(shot.dir, 15);
-        shot.pos = Vector2Add(shot.pos, shot_speed);
-        shots->shots[i] = shot;
-      } else {
-        shots->shots[i].visible = false;
-        shots->len--;
-      }
-    }
-  }
-}
-
-void draw_sight(Vector2 sight) {
-  int gap = 10;
-
-  DrawCircleV(sight, 2, SIGHT_COLOR);
-  DrawCircleLinesV(sight, 30, SIGHT_COLOR);
-
-  DrawRectangle(sight.x, sight.y - 40, 2, 30, SIGHT_COLOR);  // top
-  DrawRectangle(sight.x + gap, sight.y, 30, 2, SIGHT_COLOR); // right
-  DrawRectangle(sight.x, sight.y + gap, 2, 30, SIGHT_COLOR); // bottom
-  DrawRectangle(sight.x - 40, sight.y, 30, 2, SIGHT_COLOR);  // left
-}
-
-typedef struct {
-  Vector2 pos;
-  Vector2 dir;
-  std::vector<Vector2> points;
-} Asteroid;
-
-// std::vector<Asteroid> asteroids;
 
 int main(void) {
-  // Initialization
-  //--------------------------------------------------------------------------------------
-  SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+	// Initialization
+	//--------------------------------------------------------------------------------------
+	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 
-  InitWindow(INIT_SCREEN_WIDTH, INIT_SCREEN_HEIGHT, "Asteroids");
+	InitWindow(INIT_SCREEN_WIDTH, INIT_SCREEN_HEIGHT, "Asteroids");
 
-  SetTargetFPS(60);
+	SetTargetFPS(60);
 
-  DisableCursor();
-  //--------------------------------------------------------------------------------------
+	DisableCursor();
+	//--------------------------------------------------------------------------------------
 
-  Ship ship = create_ship();
+	Ship ship;
 
-  AllShots shots = {0};
+	std::vector<Shot> shots;
 
-  Screen screen = init_screen(GetScreenWidth(), GetScreenHeight());
+	Screen screen = initScreen(GetScreenWidth(), GetScreenHeight());
 
-  Vector2 sight = {0, 0};
+	Asteroid asteroid1(
+		Vector2{fieldWidth / 2.f, fieldHeight / 2.f},
+		Vector2{3, 0},
+		std::vector<Vector2> {
+			Vector2{51, 78},
+			Vector2{-15, 99},
+			Vector2{-20, 0},
+			Vector2{0, -40},
+			Vector2{82, -48},
+			Vector2{126, 12},
+		}
+	);
 
-  Asteroid ast = (Asteroid){
-    .pos = Vector2{fieldWidth / 2.f, fieldHeight / 2.f},
-    .dir = Vector2{1, 0},
-    .points = std::vector<Vector2> {
-      Vector2{1, 0}, Vector2{1, 1}, Vector2{-1, 0}, Vector2{-1, -1},
-    },
-  };
+	std::vector<Asteroid> asteroids = {
+		asteroid1
+	};
 
-  // Main game loop
-  while (!WindowShouldClose()) {
-    if (IsWindowResized()) {
-      screen = init_screen(GetScreenWidth(), GetScreenHeight());
-    }
+	while (!WindowShouldClose()) {
+		if (IsWindowResized()) {
+			screen = initScreen(GetScreenWidth(), GetScreenHeight());
+		}
 
-    sight = GetMousePosition();
+		ship.is_engine_working = false;
 
-    ship.is_engine_working = false;
+		if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+			addShot(screen, shots, ship);
+		}
 
-    if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-      add_shot(&screen, &shots, &ship, sight);
-    }
+		if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
+			ship.rotate(LEFT);
+		}
 
-    if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
-      rotate_ship(&ship, LEFT);
-    }
+		if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
+			ship.rotate(RIGHT);
+		}
 
-    if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
-      rotate_ship(&ship, RIGHT);
-    }
+		if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
+			ship.move(FORWARD);
+		}
 
-    if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
-      move_ship(&ship, FORWARD);
-    }
+		if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
+			ship.move(BACKWARD);
+		}
 
-    if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
-      move_ship(&ship, BACKWARD);
-    }
+		ship.slowdown();
 
-    slowdown_ship(&ship);
+		moveShots(shots);
 
-    move_shots(&shots);
+		{
+			std::vector<size_t> to_remove;
+			for (size_t i = 0; i < asteroids.size(); i++) {
+				Asteroid& asteroid = asteroids[i];
 
-    // Draw
-    //----------------------------------------------------------------------------------
-    BeginDrawing();
-    ClearBackground(DARKGRAY);
+				asteroid.rotate();
+				asteroid.move();
 
-    draw_net(&screen, &ship);
-    draw_ship(&screen, &ship);
+				if (!asteroid.isOnField(screen, ship)) {
+					to_remove.push_back(i);
+				}
+			}
 
-    draw_shots(&screen, &ship, &shots);
+			for (size_t i = to_remove.size(); i-- > 0; ) {
+				asteroids.erase(asteroids.begin() + to_remove[i]);
+			}
+		}
 
-	// DrawSplineLinear(ast.points.data(), ast.points.size(), 1, LIME);
-    
-    for (size_t i = 1; i < ast.points.size(); i++) {
-      Vector2 p = Vector2Add(ast.pos, Vector2Scale(ast.points[i], 10.0));      
-	  DrawCircleV(field_pos_to_screen_pos(&screen, &ship, p), 2, LIME);    
-    }
-    
-    draw_sight(sight);
+		// Draw ---------------------------------------------------------------------------
+		BeginDrawing();
 
-    // --------------
-    draw_info(&screen, &ship, &shots);
+		ClearBackground(DARKGRAY);
 
-    EndDrawing();
-    //----------------------------------------------------------------------------------
-  }
+		drawNet(screen, ship);
+		drawShip(screen, ship);
 
-  // De-Initialization
-  //--------------------------------------------------------------------------------------
-  CloseWindow(); // Close window and OpenGL context
-  //--------------------------------------------------------------------------------------
+		drawShots(screen, ship, shots);
 
-  return 0;
+		for (Asteroid& asteroid : asteroids) {
+			drawAsteroid(screen, ship, asteroid);
+		}
+
+		drawInfo(screen, ship, shots);
+
+		EndDrawing();
+		//----------------------------------------------------------------------------------
+	}
+
+	// De-Initialization
+	//--------------------------------------------------------------------------------------
+	CloseWindow(); // Close window and OpenGL context
+	//--------------------------------------------------------------------------------------
+
+	std::cout << "Buy!" << std::endl;
+
+	return 0;
 }
