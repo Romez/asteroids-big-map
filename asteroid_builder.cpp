@@ -146,9 +146,10 @@ void drawPointCoords(Shape& shape) {
     }
 }
 
-int main() {		
+int main() {	
+	SetConfigFlags(FLAG_WINDOW_RESIZABLE);	
 	InitWindow(screenWidth, screenHeight, "Polygon");
-
+	
     SetTargetFPS(60);
 
 	std::vector init_points = { 
@@ -162,6 +163,11 @@ int main() {
 	Shape shape(init_points);
 
 	while(!WindowShouldClose()) {
+		if (IsWindowResized()) {
+			screenWidth = GetScreenWidth();
+			screenHeight = GetScreenHeight();
+		}
+
 		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
 			if (shape.selected_point == -1) {
 				Vector2 pos = GetMousePosition();
