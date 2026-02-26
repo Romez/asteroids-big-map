@@ -148,6 +148,7 @@ void drawPointCoords(Shape& shape) {
 
 int main() {	
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE);	
+	
 	InitWindow(screenWidth, screenHeight, "Polygon");
 	
     SetTargetFPS(60);
