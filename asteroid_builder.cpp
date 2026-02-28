@@ -5,6 +5,7 @@
 #include <vector>
 #include <raylib.h>
 #include <raymath.h>
+#include <assert.h>
 
 int screenWidth = 1200;
 int screenHeight = 900;
@@ -12,127 +13,129 @@ int screenHeight = 900;
 float rotationAngle = 0.05;
 
 const Vector2 screenCenter = Vector2{
-	.x = screenWidth / 2.0f,
-	.y = screenHeight / 2.0f
+    .x = screenWidth / 2.0f,
+    .y = screenHeight / 2.0f
 };
 
 float handleSize = 40;
 
 Vector2 centerPoint(std::vector<Vector2> points) {
-	float x = 0;
-	float y = 0;
-	float a = 0;
+    float x = 0;
+    float y = 0;
+    float a = 0;
 
-	size_t n = points.size();
+    size_t n = points.size();
 
-	for (size_t i = 0; i < n; i++) {
-		float x1 = points[i].x;
-		float y1 = points[i].y;
+    for (size_t i = 0; i < n; i++) {
+        float x1 = points[i].x;
+        float y1 = points[i].y;
 
-		float x2 = points[(i + 1) % n].x;
-		float y2 = points[(i + 1) % n].y;
-		
-		a += x1 * y2 - x2 * y1;
+        float x2 = points[(i + 1) % n].x;
+        float y2 = points[(i + 1) % n].y;
 
-		float cross = (x1 * y2 - x2 * y1);
-		x += (x1 + x2) * cross;
-		y += (y1 + y2) * cross;
-	}
+        a += x1 * y2 - x2 * y1;
 
-	x /= (3 * a);
-	y /= (3 * a);
+        float cross = (x1 * y2 - x2 * y1);
+        x += (x1 + x2) * cross;
+        y += (y1 + y2) * cross;
+    }
 
-	return Vector2 {x, y};
+    x /= (3 * a);
+    y /= (3 * a);
+
+    return Vector2{ x, y };
 }
 
 class Shape {
 public:
-	Vector2 polyCenter;
-	std::vector<Vector2> points;
-	bool isRotating = false;
-	ssize_t selected_point = -1;
+    Vector2 polyCenter;
+    std::vector<Vector2> points;
+    bool isRotating = false;
+    ssize_t selected_point = -1;
+    bool active = false;
 
-	Shape(std::vector<Vector2>& points_p) {
-		for (Vector2 p : points_p) {
-			points.push_back(Vector2Add(screenCenter, p));
-		}
+    Shape(std::vector<Vector2>& points_p) {
+        for (Vector2 p : points_p) {
+            points.push_back(Vector2Add(screenCenter, p));
+        }
 
-		polyCenter = centerPoint(points);
-	}
+        polyCenter = centerPoint(points);
+    }
 
-	void toggleRotation() {
-		isRotating = !isRotating;
-	}
+    void toggleRotation() {
+        isRotating = !isRotating;
+    }
 
-	void appendPoint(Vector2 point) {
-		TraceLog(LOG_INFO, std::format("New Point at {}; {}", point.x, point.y).c_str());
-		points.push_back(point);
-		polyCenter = centerPoint(points);
-	}
+    void appendPoint(Vector2 point) {
+        TraceLog(LOG_INFO, std::format("New Point at {}; {}", point.x, point.y).c_str());
+        points.push_back(point);
+        polyCenter = centerPoint(points);
+    }
 
-	void deletePoint(size_t i) {
-		TraceLog(LOG_INFO, std::format("Delete Point at {:d}", i).c_str());
-		points.erase(points.begin() + i);
-		polyCenter = centerPoint(points);
-	}
+    void deletePoint(size_t i) {
+        TraceLog(LOG_INFO, std::format("Delete Point at {:d}", i).c_str());
+        points.erase(points.begin() + i);
+        polyCenter = centerPoint(points);
+    }
 
-	void rotatePointAt(size_t i) {
+    void rotatePointAt(size_t i) {
         Vector2 p = points[i];
         p = Vector2Subtract(p, polyCenter);
         p = Vector2Rotate(p, rotationAngle);
         p = Vector2Add(p, polyCenter);
-        
-		points[i] = p;
-	}
 
-	ssize_t getPointAtPosition(Vector2 pos) {
-		for (size_t i = 0; i < points.size(); i++) {
-			Vector2 p = points[i];
+        points[i] = p;
+    }
 
-			float half = handleSize / 2.0;
-			
-			if ((p.x - half <= pos.x && pos.x <= p.x + half) && 
-				(p.y - half <= pos.y && pos.y <= p.y + half)) {
-				return i;
-			}
-		}
+    ssize_t getPointAtPosition(Vector2 pos) {
+        for (size_t i = 0; i < points.size(); i++) {
+            Vector2 p = points[i];
 
-		return -1;
-	}
+            float half = handleSize / 2.0;
 
-	bool isPointSelected() {
-		return selected_point != -1;
-	}
+            if ((p.x - half <= pos.x && pos.x <= p.x + half) &&
+                (p.y - half <= pos.y && pos.y <= p.y + half)) {
+                return i;
+            }
+        }
 
-	void selectPoint(size_t i) {
-		selected_point = i;
-	}
+        return -1;
+    }
 
-	void skipSelectedPoint() {
-		selected_point = -1;
-	}
+    bool isPointSelected() {
+        return selected_point != -1;
+    }
 
-	void moveSelectedPoint(Vector2 pos) {
-		points[selected_point] = pos;
-		polyCenter = centerPoint(points);
-	}
+    void selectPoint(size_t i) {
+        selected_point = i;
+    }
+
+    void skipSelectedPoint() {
+        selected_point = -1;
+    }
+
+    void moveSelectedPoint(Vector2 pos) {
+        points[selected_point] = pos;
+        polyCenter = centerPoint(points);
+    }
 };
 
 void drawShape(Shape& shape) {
-	for (size_t i = 1; i <= shape.points.size(); i++) {
-			Vector2 p1 = shape.points[i-1];
-			Vector2 p2 = shape.points[i % shape.points.size()];
+    for (size_t i = 1; i <= shape.points.size(); i++) {
+        Vector2 p1 = shape.points[i - 1];
+        Vector2 p2 = shape.points[i % shape.points.size()];
 
-			DrawLineV(p1, p2, LIME);
-		}
+        DrawLineV(p1, p2, shape.active ? RED : LIME);
+        DrawCircleV(p1, 4, SKYBLUE);
+    }
 
-		DrawCircleV(shape.polyCenter, 2, LIME);
+    DrawCircleV(shape.polyCenter, 2, LIME);
 
-		for (size_t i = 0; i < shape.points.size(); i++) {
-			Vector2 p = shape.points[i];
+    for (size_t i = 0; i < shape.points.size(); i++) {
+        Vector2 p = shape.points[i];
 
-			DrawRectangleLines(p.x - (handleSize / 2), p.y - (handleSize / 2), handleSize, handleSize, LIME);
-		}
+        DrawRectangleLines(p.x - (handleSize / 2), p.y - (handleSize / 2), handleSize, handleSize, LIME);
+    }
 }
 
 void drawPointCoords(Shape& shape) {
@@ -140,88 +143,138 @@ void drawPointCoords(Shape& shape) {
         int fontSize = 20;
 
         Vector2 p = Vector2Subtract(screenCenter, shape.points[i]);
-        std::string text = std::format("Point {:d} {:.2f} {:.2f}", i, p.x, p.y);
+        std::string text = std::format("Point {:d} {:d} {:d}", i, (int)p.x, (int)p.y);
 
         DrawText(text.c_str(), 0, i * fontSize, fontSize, LIME);
     }
 }
 
-int main() {	
-	SetConfigFlags(FLAG_WINDOW_RESIZABLE);	
-	
-	InitWindow(screenWidth, screenHeight, "Polygon");
-	
+bool CheckCollisionShape(Shape &shape, Vector2 p) {
+    assert(shape.points.size() > 1);
+
+    bool inside = false;
+
+    size_t count = shape.points.size();
+    auto verts = shape.points;
+
+    for (size_t i = 0, j = count - 1; i < count; j = i++) {
+        Vector2 p1 = verts[i];
+        Vector2 p2 = verts[j];
+
+        // Check if edge (i,j) crosses a horizontal ray to the right of the point
+        bool intersect = ((p1.y > p.y) != (p2.y > p.y)) &&
+            (p.x < (p2.x - p1.x) * (p.y - p1.y) / (p2.y - p1.y + 0.000001f) + p1.x);
+
+        if (intersect) {
+            inside = !inside;
+        }
+    }
+
+    return inside;
+}
+
+int main() {
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+
+    InitWindow(screenWidth, screenHeight, "Polygon");
+
     SetTargetFPS(60);
 
-	std::vector init_points = { 
-		Vector2{-80.123, 0},
-		Vector2{0, -20.0},
+    std::vector init_points = {
+		Vector2{-80, 0},
+		Vector2{40, -50.0},
 		Vector2{20, 0},
-		Vector2{0, 40},
+		Vector2{-40, 40},
 		Vector2{-20, 20},
 	};
 
-	Shape shape(init_points);
+    Shape shape(init_points);
 
-	while(!WindowShouldClose()) {
-		if (IsWindowResized()) {
-			screenWidth = GetScreenWidth();
-			screenHeight = GetScreenHeight();
-		}
+    bool collisionDetect = false;
 
-		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-			if (shape.selected_point == -1) {
-				Vector2 pos = GetMousePosition();
+    while (!WindowShouldClose()) {
+        if (IsWindowResized()) {
+            screenWidth = GetScreenWidth();
+            screenHeight = GetScreenHeight();
+        }
 
-				ssize_t i = shape.getPointAtPosition(pos);
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
+            if (shape.selected_point == -1) {
+                Vector2 pos = GetMousePosition();
 
-				if (IsKeyDown(KEY_LEFT_CONTROL)) {
-					if (i > -1) {
-						shape.deletePoint(i);
-					} else {
-						shape.appendPoint(pos);
-					}
-				} else if (i > -1) {
-					shape.selectPoint(i);
-				}
-			}
-		}
+                ssize_t i = shape.getPointAtPosition(pos);
 
-		if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
-			if (shape.isPointSelected()) {
-				shape.skipSelectedPoint();
-			}
-		}
+                if (IsKeyDown(KEY_LEFT_CONTROL)) {
+                    if (i > -1) {
+                        shape.deletePoint(i);
+                    }
+                    else {
+                        shape.appendPoint(pos);
+                    }
+                }
+                else if (i > -1) {
+                    shape.selectPoint(i);
+                }
+            }
+        }
 
-		if (IsKeyPressed(KEY_SPACE)) {
-			shape.toggleRotation();
-		}
+        if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
+            if (shape.isPointSelected()) {
+                shape.skipSelectedPoint();
+            }
+        }
 
-		if (shape.isPointSelected()) {
-			Vector2 pos = GetMousePosition();
-			shape.moveSelectedPoint(pos);
-		}
+        if (IsKeyPressed(KEY_SPACE)) {
+            shape.toggleRotation();
+        }
 
-		if (shape.isRotating) {
-			for (size_t i = 0; i < shape.points.size(); i++) {
-				shape.rotatePointAt(i);
-			}
-		}
+        if (IsKeyDown(KEY_LEFT_CONTROL)) {
+            collisionDetect = true;
 
-		BeginDrawing();
+            Vector2 pos = GetMousePosition();
 
-		ClearBackground(DARKBROWN);
-		
-		drawShape(shape);
-        
+            if (CheckCollisionShape(shape, pos)) {
+                shape.active = true;
+            }
+            else {
+                shape.active = false;
+            }
+        }
+        else {
+            collisionDetect = false;
+            shape.active = false;
+        }
+
+        if (shape.isPointSelected()) {
+            Vector2 pos = GetMousePosition();
+            shape.moveSelectedPoint(pos);
+        }
+
+        if (shape.isRotating) {
+            for (size_t i = 0; i < shape.points.size(); i++) {
+                shape.rotatePointAt(i);
+            }
+        }
+
+        BeginDrawing();
+
+        ClearBackground(DARKBROWN);
+
+        drawShape(shape);
+
         drawPointCoords(shape);
+
+        if (collisionDetect) {
+            Vector2 pos = GetMousePosition();
+            DrawCircleV(pos, 4, RED);
+        }
 
         // DrawFPS(200, 10);
 
-		EndDrawing();
-	}
+        EndDrawing();
+    }
 
-	CloseWindow();
-	
-	return 0;
+    CloseWindow();
+
+    return 0;
 }
