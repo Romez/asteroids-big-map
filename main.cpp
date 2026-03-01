@@ -445,27 +445,35 @@ Asteroid getRandAsteroid() {
     Asteroid asteroid;
 
     if (side == 0) { // top
-        pos = Vector2{(float)GetRandomValue(0, fieldWidth), 0 };
-        dir = Vector2{(float)GetRandomValue(1, 3), (float)GetRandomValue(1, 3)};
-    } else if (side == 1) { // right
-        pos = Vector2{0, (float)GetRandomValue(0, fieldHeight)};
-        dir = Vector2{(float)GetRandomValue(1, 3), (float)GetRandomValue(-3, 3)};
-    } else if (side == 2) { // bottom
+        pos = Vector2{ (float)GetRandomValue(0, fieldWidth), 0 };
+        dir = Vector2{ (float)GetRandomValue(1, 3), (float)GetRandomValue(1, 3) };
+    }
+    else if (side == 1) { // right
+        pos = Vector2{ 0, (float)GetRandomValue(0, fieldHeight) };
+        dir = Vector2{ (float)GetRandomValue(1, 3), (float)GetRandomValue(-3, 3) };
+    }
+    else if (side == 2) { // bottom
         pos = Vector2{ (float)GetRandomValue(0, fieldWidth), fieldHeight };
-        dir = Vector2{ (float)GetRandomValue(-3, 3), (float)GetRandomValue(-3, -1)};
-    } else { // left
-        pos = Vector2{0, (float)GetRandomValue(0, fieldHeight)};
-        dir = Vector2{(float)GetRandomValue(1, 3), (float)GetRandomValue(-3, 3)};
+        dir = Vector2{ (float)GetRandomValue(-3, 3), (float)GetRandomValue(-3, -1) };
+    }
+    else { // left
+        pos = Vector2{ 0, (float)GetRandomValue(0, fieldHeight) };
+        dir = Vector2{ (float)GetRandomValue(1, 3), (float)GetRandomValue(-3, 3) };
     }
 
     return Asteroid(pos, dir, asteroidsLibarary[i]);
 }
 
 void drawScore(Screen& screen, uint64_t score) {
-    Vector2 textPos = {screen.w / 2.0f, 10};
+    Vector2 textPos = { screen.w / 2.0f, 10 };
     std::string buf = std::format("Score {:d}", score);
     DrawTextEx(font, buf.c_str(), textPos, (float)font.baseSize, 2, LIGHTGRAY);
 }
+
+enum class GameScreen {
+    TITLE,
+    GAME,
+};
 
 int main(void) {
     // Initialization
@@ -485,6 +493,8 @@ int main(void) {
 
     bool debugDisplay = false;
 
+    GameScreen gameScreen = GameScreen::TITLE;
+
     uint64_t score = 0;
 
     Ship ship;
@@ -500,117 +510,135 @@ int main(void) {
             screen = initScreen(GetScreenWidth(), GetScreenHeight());
         }
 
-        ship.is_engine_working = false;
+        if (gameScreen == GameScreen::TITLE) {
+            if (IsKeyPressed(KEY_ENTER)) {
+                gameScreen = GameScreen::GAME;
+            }
 
-        if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-            addShot(screen, shots, ship);
+            BeginDrawing();
+
+            ClearBackground(DARKGRAY);
+
+            std::string text = "Press Enter to start";
+            Vector2 textSize = MeasureTextEx(font, text.c_str(), font.baseSize, 2);
+
+            Vector2 textPos = {(screen.w / 2) - (textSize.x / 2), (screen.h / 2) - (textSize.y / 2)};
+            
+            DrawTextEx(font, text.c_str(), textPos, (float)font.baseSize, 2, LIGHTGRAY);
+            
+            EndDrawing();
         }
+        else if (gameScreen == GameScreen::GAME) {
+            ship.is_engine_working = false;
 
-        if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
-            ship.rotate(LEFT);
-        }
+            if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                addShot(screen, shots, ship);
+            }
 
-        if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
-            ship.rotate(RIGHT);
-        }
+            if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
+                ship.rotate(LEFT);
+            }
 
-        if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
-            ship.move(FORWARD);
-        }
+            if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
+                ship.rotate(RIGHT);
+            }
 
-        if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
-            ship.move(BACKWARD);
-        }
+            if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
+                ship.move(FORWARD);
+            }
 
-        if (IsKeyPressed(KEY_L)) {
-            debugDisplay = !debugDisplay;
-        }
+            if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
+                ship.move(BACKWARD);
+            }
 
-        ship.slowdown();
+            if (IsKeyPressed(KEY_L)) {
+                debugDisplay = !debugDisplay;
+            }
 
-        moveShots(shots);
+            ship.slowdown();
 
-        for (size_t i = 0; i < MAX_ASTEROIDS_COUNT - asteroids.size(); i++) {
-            asteroids.push_back(getRandAsteroid());
-        }
+            moveShots(shots);
 
-        {
-            std::vector<size_t> asteroids_to_remove;
-            std::vector<size_t> shots_to_remove;
+            for (size_t i = 0; i < MAX_ASTEROIDS_COUNT - asteroids.size(); i++) {
+                asteroids.push_back(getRandAsteroid());
+            }
 
-            for (size_t i = 0; i < asteroids.size(); i++) {
-                Asteroid& asteroid = asteroids[i];
+            {
+                std::vector<size_t> asteroids_to_remove;
+                std::vector<size_t> shots_to_remove;
 
-                asteroid.rotate();
-                asteroid.move();
+                for (size_t i = 0; i < asteroids.size(); i++) {
+                    Asteroid& asteroid = asteroids[i];
 
-                // is on field?
-                if (!asteroid.isOnField(screen, ship)) {
-                    asteroids_to_remove.push_back(i);
-                    continue;
-                }
+                    asteroid.rotate();
+                    asteroid.move();
 
-                std::vector<Vector2> asteroidVertices;
-                for (Vector2 v : asteroid.vertices) {
-                    Vector2 p = Vector2Add(asteroid.pos, v);
-                    asteroidVertices.push_back(p);
-                }
-
-                // check ship collision
-
-                auto [v1, v2, v3] = ship.getVertices();
-                v1 = Vector2Add(ship.pos, v1);
-                v2 = Vector2Add(ship.pos, v2);
-                v3 = Vector2Add(ship.pos, v3);
-
-                if (CheckAsteroidCollision(v1, asteroidVertices) ||
-                    CheckAsteroidCollision(v2, asteroidVertices) ||
-                    CheckAsteroidCollision(v3, asteroidVertices)) {
-                    asteroids_to_remove.push_back(i);
-                    continue;
-                }
-
-                for (size_t j = 0; j < shots.size(); j++) {
-                    Shot& shot = shots[j];
-                    if (CheckAsteroidCollision(shot.pos, asteroidVertices)) {
-                        shots_to_remove.push_back(j);
+                    // is on field?
+                    if (!asteroid.isOnField(screen, ship)) {
                         asteroids_to_remove.push_back(i);
-                        score++;
+                        continue;
+                    }
+
+                    std::vector<Vector2> asteroidVertices;
+                    for (Vector2 v : asteroid.vertices) {
+                        Vector2 p = Vector2Add(asteroid.pos, v);
+                        asteroidVertices.push_back(p);
+                    }
+
+                    // check ship collision
+
+                    auto [v1, v2, v3] = ship.getVertices();
+                    v1 = Vector2Add(ship.pos, v1);
+                    v2 = Vector2Add(ship.pos, v2);
+                    v3 = Vector2Add(ship.pos, v3);
+
+                    if (CheckAsteroidCollision(v1, asteroidVertices) ||
+                        CheckAsteroidCollision(v2, asteroidVertices) ||
+                        CheckAsteroidCollision(v3, asteroidVertices)) {
+                        asteroids_to_remove.push_back(i);
+                        continue;
+                    }
+
+                    for (size_t j = 0; j < shots.size(); j++) {
+                        Shot& shot = shots[j];
+                        if (CheckAsteroidCollision(shot.pos, asteroidVertices)) {
+                            shots_to_remove.push_back(j);
+                            asteroids_to_remove.push_back(i);
+                            score++;
+                        }
                     }
                 }
+
+                for (size_t i = asteroids_to_remove.size(); i-- > 0; ) {
+                    asteroids.erase(asteroids.begin() + asteroids_to_remove[i]);
+                }
+
+                for (size_t i = shots_to_remove.size(); i-- > 0; ) {
+                    shots.erase(shots.begin() + shots_to_remove[i]);
+                }
             }
 
-            for (size_t i = asteroids_to_remove.size(); i-- > 0; ) {
-                asteroids.erase(asteroids.begin() + asteroids_to_remove[i]);
+            BeginDrawing();
+
+            ClearBackground(DARKGRAY);
+
+            drawNet(screen, ship);
+            drawShip(screen, ship);
+
+            drawShots(screen, ship, shots);
+
+            for (Asteroid& asteroid : asteroids) {
+                drawAsteroid(screen, ship, asteroid);
             }
 
-            for (size_t i = shots_to_remove.size(); i-- > 0; ) {
-                shots.erase(shots.begin() + shots_to_remove[i]);
+            drawScore(screen, score);
+
+            if (debugDisplay) {
+                drawInfo(screen, ship, shots, asteroids);
             }
+
+            EndDrawing();
         }
-
-        // Draw ---------------------------------------------------------------------------
-        BeginDrawing();
-
-        ClearBackground(DARKGRAY);
-
-        drawNet(screen, ship);
-        drawShip(screen, ship);
-
-        drawShots(screen, ship, shots);
-
-        for (Asteroid& asteroid : asteroids) {
-            drawAsteroid(screen, ship, asteroid);
-        }
-
-        drawScore(screen, score);
-
-        if (debugDisplay) {
-            drawInfo(screen, ship, shots, asteroids);
-        }
-
-        EndDrawing();
-        //----------------------------------------------------------------------------------
     }
 
     // De-Initialization
