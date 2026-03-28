@@ -25,6 +25,8 @@
 
 #define MAX_ASTEROIDS_COUNT 10
 
+#define MAX(a, b) (a > b ? (a) : (b))
+
 const float ROTATION_SPEED = PI / 32;
 const float MAX_SPEED = 6;
 
@@ -168,6 +170,8 @@ Vector2 centerPoint(std::vector<Vector2> vertices) {
 
 const float rotationAngle = 0.05;
 
+float fieldGap = 100;
+
 struct Asteroid {
     Vector2 pos;
     Vector2 dir;
@@ -196,13 +200,15 @@ struct Asteroid {
     }
 
     bool isOnField(Screen& screen, Ship& ship) {
-        if (0 <= pos.x && pos.x <= fieldWidth && 0 <= pos.y && pos.y <= fieldHeight) {
+        if (-fieldGap <= pos.x && pos.x <= fieldWidth + fieldGap &&
+            -fieldGap <= pos.y && pos.y <= fieldHeight + fieldGap) {
             return true;
         }
 
         for (Vector2 vertex : vertices) {
             Vector2 p = Vector2Add(pos, vertex);
-            if (0 <= p.x && p.x <= fieldWidth && 0 <= p.y && p.y <= fieldHeight) {
+            if (-fieldGap <= p.x && p.x <= fieldWidth + fieldGap &&
+                -fieldGap <= p.y && p.y <= fieldHeight + fieldGap) {
                 return true;
             }
         }
@@ -456,19 +462,19 @@ Asteroid getRandAsteroid() {
     Asteroid asteroid;
 
     if (side == 0) { // top
-        pos = Vector2{ (float)GetRandomValue(0, fieldWidth), 0 };
+        pos = Vector2{ (float)GetRandomValue(0, fieldWidth), -fieldGap };
         dir = Vector2{ (float)GetRandomValue(1, 3), (float)GetRandomValue(1, 3) };
     }
     else if (side == 1) { // right
-        pos = Vector2{ 0, (float)GetRandomValue(0, fieldHeight) };
-        dir = Vector2{ (float)GetRandomValue(1, 3), (float)GetRandomValue(-3, 3) };
+        pos = Vector2{ fieldWidth + fieldGap, (float)GetRandomValue(0, fieldHeight) };
+        dir = Vector2{ (float)GetRandomValue(-3, -1), (float)GetRandomValue(-3, 3) };
     }
     else if (side == 2) { // bottom
-        pos = Vector2{ (float)GetRandomValue(0, fieldWidth), fieldHeight };
+        pos = Vector2{ (float)GetRandomValue(0, fieldWidth), fieldHeight + fieldGap};
         dir = Vector2{ (float)GetRandomValue(-3, 3), (float)GetRandomValue(-3, -1) };
     }
     else { // left
-        pos = Vector2{ 0, (float)GetRandomValue(0, fieldHeight) };
+        pos = Vector2{ -fieldGap, (float)GetRandomValue(0, fieldHeight) };
         dir = Vector2{ (float)GetRandomValue(1, 3), (float)GetRandomValue(-3, 3) };
     }
 
@@ -514,11 +520,14 @@ int main(void) {
 
     Screen screen = initScreen(GetScreenWidth(), GetScreenHeight());
 
+    fieldGap = MAX(GetScreenWidth(), GetScreenHeight()) / 2.0;
+
     std::vector<Asteroid> asteroids;
 
     while (!WindowShouldClose()) {
         if (IsWindowResized()) {
             screen = initScreen(GetScreenWidth(), GetScreenHeight());
+            fieldGap = MAX(GetScreenWidth(), GetScreenHeight()) / 2.0;
         }
 
         if (gameScreen == GameScreen::TITLE) {
