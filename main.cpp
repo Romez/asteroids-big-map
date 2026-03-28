@@ -401,7 +401,7 @@ void moveShots(std::vector<Shot>& shots) {
     }
 }
 
-bool CheckAsteroidCollision(Vector2 p, std::vector<Vector2>& points) {
+bool CheckPointCollisionWithPoly(Vector2 p, std::vector<Vector2>& points) {
     assert(points.size() > 1);
 
     bool inside = false;
@@ -422,6 +422,17 @@ bool CheckAsteroidCollision(Vector2 p, std::vector<Vector2>& points) {
     }
 
     return inside;
+}
+
+bool checkShipCollisionWithPoly(Ship& ship, std::vector<Vector2>& points) {
+    auto [v1, v2, v3] = ship.getVertices();
+    v1 = Vector2Add(ship.pos, v1);
+    v2 = Vector2Add(ship.pos, v2);
+    v3 = Vector2Add(ship.pos, v3);
+
+    return CheckPointCollisionWithPoly(v1, points) ||
+           CheckPointCollisionWithPoly(v2, points) ||
+           CheckPointCollisionWithPoly(v3, points);
 }
 
 std::vector<std::vector<Vector2>> asteroidsLibarary = {
@@ -522,10 +533,13 @@ int main(void) {
             std::string text = "Press Enter to start";
             Vector2 textSize = MeasureTextEx(font, text.c_str(), font.baseSize, 2);
 
-            Vector2 textPos = {(screen.w / 2) - (textSize.x / 2), (screen.h / 2) - (textSize.y / 2)};
-            
+            Vector2 textPos = {
+                .x = ((float)screen.w / 2) - (textSize.x / 2),
+                .y = ((float)screen.h / 2) - (textSize.y / 2),
+            };
+
             DrawTextEx(font, text.c_str(), textPos, (float)font.baseSize, 2, LIGHTGRAY);
-            
+
             EndDrawing();
         }
         else if (gameScreen == GameScreen::GAME) {
@@ -557,8 +571,7 @@ int main(void) {
 
             ship.slowdown();
 
-            moveShots(shots);
-
+            // Add asteroids
             for (size_t i = 0; i < MAX_ASTEROIDS_COUNT - asteroids.size(); i++) {
                 asteroids.push_back(getRandAsteroid());
             }
@@ -573,35 +586,27 @@ int main(void) {
                     asteroid.rotate();
                     asteroid.move();
 
-                    // is on field?
                     if (!asteroid.isOnField(screen, ship)) {
                         asteroids_to_remove.push_back(i);
                         continue;
                     }
 
-                    std::vector<Vector2> asteroidVertices;
+                    std::vector<Vector2> asteroidVerticesFieldPos;
                     for (Vector2 v : asteroid.vertices) {
                         Vector2 p = Vector2Add(asteroid.pos, v);
-                        asteroidVertices.push_back(p);
+                        asteroidVerticesFieldPos.push_back(p);
                     }
 
-                    // check ship collision
+                    // check asteroid and ship collision
 
-                    auto [v1, v2, v3] = ship.getVertices();
-                    v1 = Vector2Add(ship.pos, v1);
-                    v2 = Vector2Add(ship.pos, v2);
-                    v3 = Vector2Add(ship.pos, v3);
-
-                    if (CheckAsteroidCollision(v1, asteroidVertices) ||
-                        CheckAsteroidCollision(v2, asteroidVertices) ||
-                        CheckAsteroidCollision(v3, asteroidVertices)) {
+                    if (checkShipCollisionWithPoly(ship, asteroidVerticesFieldPos)) {
                         asteroids_to_remove.push_back(i);
                         continue;
                     }
 
                     for (size_t j = 0; j < shots.size(); j++) {
                         Shot& shot = shots[j];
-                        if (CheckAsteroidCollision(shot.pos, asteroidVertices)) {
+                        if (CheckPointCollisionWithPoly(shot.pos, asteroidVerticesFieldPos)) {
                             shots_to_remove.push_back(j);
                             asteroids_to_remove.push_back(i);
                             score++;
@@ -617,6 +622,8 @@ int main(void) {
                     shots.erase(shots.begin() + shots_to_remove[i]);
                 }
             }
+
+            moveShots(shots);
 
             BeginDrawing();
 
