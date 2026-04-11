@@ -1,4 +1,6 @@
 #include "./asteroid.h"
+#include <raylib.h>
+#include <raymath.h>
 
 const float rotationAngle = 0.05;
 
@@ -51,4 +53,22 @@ void rotateAsteroid(Asteroid& asteroid) {
 
 void moveAsteroid(Asteroid& asteroid) {
     asteroid.pos = Vector2Add(asteroid.pos, asteroid.dir);
+}
+
+std::vector<Asteroid> asteroidToShards(Asteroid& asteroid) {
+    size_t v_size = asteroid.vertices.size();
+    std::vector<Asteroid> shards;
+    for (size_t k = 0; k < v_size; k++) {
+        Vector2 v1 = asteroid.vertices[k];
+        Vector2 v2 = asteroid.vertices[(k + 1) % v_size];
+        Vector2 v3 = asteroid.polyCenter;
+
+        Vector2 dir = Vector2Scale(Vector2Normalize(v1), 3);
+
+        Vector2 pos = Vector2Add(asteroid.pos, dir);
+
+        Asteroid shard = buildAsteroid(pos, dir, {v1, v2, v3});
+        shards.push_back(shard);
+    }
+    return shards;
 }

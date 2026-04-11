@@ -2,6 +2,7 @@
 #include <assert.h>
 #include <math.h>
 #include <raylib.h>
+#include <raymath.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -337,6 +338,30 @@ void drawScore(Screen& screen, uint64_t score) {
     DrawTextEx(font, buf.c_str(), textPos, (float)font.baseSize, 2, LIGHTGRAY);
 }
 
+void moveAsteroids(std::vector<Asteroid>& asteroids) {
+    for (size_t i = 0; i < asteroids.size(); i++) {
+        Asteroid& asteroid = asteroids[i];
+
+        rotateAsteroid(asteroid);
+        moveAsteroid(asteroid);
+    }
+}
+
+void removeAsteroidsFromField(Screen screen, std::vector<Asteroid>& asteroids) {
+    std::vector<size_t> asteroids_to_remove;
+    for (size_t i = 0; i < asteroids.size(); i++) {
+        Asteroid& asteroid = asteroids[i];
+        if (!isAsteroidOnField(screen, asteroid)) {
+            asteroids_to_remove.push_back(i);
+            continue;
+        }
+    }
+
+    for (size_t i = asteroids_to_remove.size(); i-- > 0; ) {
+        asteroids.erase(asteroids.begin() + asteroids_to_remove[i]);
+    }
+}
+
 int main(void) {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 
@@ -362,6 +387,7 @@ int main(void) {
     std::vector<Shot> shots;
 
     std::vector<Asteroid> asteroids;
+    std::vector<Asteroid> shards;
 
     while (!WindowShouldClose()) {
         if (IsWindowResized()) {
@@ -418,9 +444,17 @@ int main(void) {
             slowdownShip(ship, fieldSize.w, fieldSize.h);
 
             // Add asteroids
-            for (size_t i = 0; i < MAX_ASTEROIDS_COUNT - asteroids.size(); i++) {
-                asteroids.push_back(getRandAsteroid(screen));
+            if (asteroids.size() < MAX_ASTEROIDS_COUNT) {
+                for (size_t i = 0; i < MAX_ASTEROIDS_COUNT - asteroids.size(); i++) {
+                    asteroids.push_back(getRandAsteroid(screen));
+                }
             }
+
+            removeAsteroidsFromField(screen, shards);
+            moveAsteroids(shards);
+
+            removeAsteroidsFromField(screen, asteroids);
+            moveAsteroids(asteroids);
 
             {
                 std::vector<size_t> asteroids_to_remove;
@@ -428,14 +462,6 @@ int main(void) {
 
                 for (size_t i = 0; i < asteroids.size(); i++) {
                     Asteroid& asteroid = asteroids[i];
-
-                    rotateAsteroid(asteroid);
-                    moveAsteroid(asteroid);
-
-                    if (!isAsteroidOnField(screen, asteroid)) {
-                        asteroids_to_remove.push_back(i);
-                        continue;
-                    }
 
                     std::vector<Vector2> asteroidVerticesFieldPos;
                     for (Vector2 v : asteroid.vertices) {
@@ -456,6 +482,10 @@ int main(void) {
                             shots_to_remove.push_back(j);
                             asteroids_to_remove.push_back(i);
                             score++;
+
+                            // shards
+                            std::vector<Asteroid> asteroidShards = asteroidToShards(asteroid);
+                            shards.insert(shards.end(), asteroidShards.begin(), asteroidShards.end());
                         }
                     }
                 }
@@ -482,6 +512,10 @@ int main(void) {
 
             for (Asteroid& asteroid : asteroids) {
                 drawAsteroid(screen, ship, asteroid);
+            }
+
+            for (Asteroid& shard : shards) {
+                drawAsteroid(screen, ship, shard);
             }
 
             drawScore(screen, score);
