@@ -3,12 +3,12 @@
 #include <array>
 #include "../include/raylib.h"
 
-enum turn {
+enum class Turn {
     LEFT,
     RIGHT,
 };
 
-enum move {
+enum class Move {
     FORWARD,
     BACKWARD,
 };
@@ -22,10 +22,10 @@ struct Ship {
 
 Ship buildShip(int fieldWidth, int fieldHeight);
 
-void rotateShip(Ship& ship, enum turn t);
+void rotateShip(Ship& ship, enum Turn t);
 
-void moveShip(Ship& ship, enum move m);
+void moveShip(Ship& ship, enum Move m);
 
 void slowdownShip(Ship& ship, int fieldWidth, int fieldHeight);
 
-std::array<Vector2, 3> getShipVertices(Ship& ship);
+std::array<Vector2, 3> getShipVertices(const Ship& ship);

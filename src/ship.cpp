@@ -15,18 +15,18 @@ Ship buildShip(int fieldWidth, int fieldHeight) {
     };
 }
 
-void rotateShip(Ship& ship, enum turn t) {
-    ship.dir = Vector2Rotate(ship.dir, t == LEFT ? -ROTATION_SPEED : ROTATION_SPEED);
+void rotateShip(Ship& ship, enum Turn t) {
+    ship.dir = Vector2Rotate(ship.dir, t == Turn::LEFT ? -ROTATION_SPEED : ROTATION_SPEED);
 }
 
-void moveShip(Ship& ship, enum move m) {
-    if (m == FORWARD) {
+void moveShip(Ship& ship, enum Move m) {
+    if (m == Move::FORWARD) {
         if (ship.speed < MAX_SPEED) {
             ship.speed += 0.2;
         }
         ship.is_engine_working = true;
     }
-    else if (m == BACKWARD) {
+    else if (m == Move::BACKWARD) {
         if (ship.speed > -MAX_SPEED) {
             ship.speed -= 0.2;
         }
@@ -69,7 +69,7 @@ void slowdownShip(Ship& ship, int fieldWidth, int fieldHeight) {
     }
 }
 
-std::array<Vector2, 3> getShipVertices(Ship& ship) {
+std::array<Vector2, 3> getShipVertices(const Ship& ship) {
     std::array<Vector2, 3> vs;
     vs[0] = Vector2Scale(ship.dir, 15);
 
