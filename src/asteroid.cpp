@@ -1,8 +1,14 @@
 #include "./asteroid.h"
 #include <raylib.h>
 #include <raymath.h>
+#include <vector>
+#include <deque>
+#include <algorithm>
+#include <random>
 
 const float rotationAngle = 0.05;
+
+std::mt19937 rng(std::random_device{}());
 
 Vector2 centerPoint(std::vector<Vector2> vertices) {
     float x = 0;
@@ -56,19 +62,40 @@ void moveAsteroid(Asteroid& asteroid) {
 }
 
 std::vector<Asteroid> asteroidToShards(Asteroid& asteroid) {
-    size_t v_size = asteroid.vertices.size();
-    std::vector<Asteroid> shards;
-    for (size_t k = 0; k < v_size; k++) {
-        Vector2 v1 = asteroid.vertices[k];
-        Vector2 v2 = asteroid.vertices[(k + 1) % v_size];
-        Vector2 v3 = asteroid.polyCenter;
+    ssize_t depth = 3;
 
-        Vector2 dir = Vector2Scale(Vector2Normalize(v1), 3);
+    std::vector<Asteroid> shards = {asteroid};
 
-        Vector2 pos = Vector2Add(asteroid.pos, dir);
+    while(depth > 0) {
+        size_t batch_size = shards.size();
+        if (batch_size > 1) {
+            batch_size /= 2;
+        }
 
-        Asteroid shard = buildAsteroid(pos, dir, {v1, v2, v3});
-        shards.push_back(shard);
+        for (size_t i = 0; i < batch_size; i++) {
+            Asteroid a = shards.back();
+            shards.pop_back();
+
+            size_t v_size = a.vertices.size();
+            for (size_t j = 0; j < v_size; j++) {
+                Vector2 v1 = a.vertices[j];
+                Vector2 v2 = a.vertices[(j + 1) % v_size];
+                Vector2 v3 = a.polyCenter;
+
+                Vector2 dir = Vector2Scale(Vector2Normalize(v1), 3);
+
+                Vector2 pos = Vector2Add(a.pos, dir);
+
+                Asteroid shard = buildAsteroid(pos, dir, {v1, v2, v3});
+
+                shards.push_back(shard);
+            }
+        }
+
+        std::shuffle(shards.begin(), shards.end(), rng);
+
+        depth--;
     }
+
     return shards;
 }
