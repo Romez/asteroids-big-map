@@ -1,8 +1,9 @@
 #pragma once
 
+#include <vector>
+#include <uuid/uuid.h>
 #include "../include/raylib.h"
 #include "../include/raymath.h"
-#include <vector>
 
 struct Asteroid {
     Vector2 pos;

@@ -12,6 +12,9 @@
 #include <vector>
 #include <array>
 #include <format>
+#include <unordered_map>
+#include <unordered_set>
+#include <random>
 #include "./asteroid.h"
 #include "./ship.h"
 #include "./shot.h"
@@ -48,11 +51,28 @@ struct Screen {
 };
 
 enum class GameScreen {
-    TITLE,
-    GAME,
+  TITLE,
+  GAME,
 };
 
-bool isAsteroidOnField(Screen& screen, Asteroid& asteroid) {
+std::string genUuid() {
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static const char* chars = "0123456789abcdef";
+
+    std::string uuid = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx";
+
+    for (char& c : uuid) {
+        if (c == 'x') {
+            c = chars[gen() % 16];
+        } else if (c == 'y') {
+            c = chars[(gen() % 4) + 8];
+        }
+    }
+    return uuid;
+}
+
+bool isAsteroidOnField(const Screen& screen, const Asteroid& asteroid) {
     auto pos = asteroid.pos;
     if (-screen.gap <= pos.x && pos.x <= fieldSize.w + screen.gap &&
         -screen.gap <= pos.y && pos.y <= fieldSize.h + screen.gap) {
@@ -136,7 +156,7 @@ void drawShip(Screen& screen, Ship& ship) {
     }
 }
 
-void drawInfo(Screen& screen, Ship& ship, std::vector<Shot>& shots, std::vector<Asteroid>& asteroids) {
+void drawInfo(Screen& screen, Ship& ship, std::unordered_map<std::string, Shot>& shots, std::unordered_map<std::string, Asteroid>& asteroids) {
     // Ship position on the field
     float leftPadding = 10;
     float topPadding = 10;
@@ -202,9 +222,10 @@ Vector2 fieldPosToScreenPos(Screen& screen, Ship& ship, Vector2 field_pos) {
     return Vector2{ x, y };
 }
 
-void drawShots(Screen& screen, Ship& ship, std::vector<Shot>& shots) {
-    for (size_t i = 0; i < shots.size(); i++) {
-        Shot shot = shots[i];
+void drawShots(Screen& screen, Ship& ship, std::unordered_map<std::string, Shot>& shots) {
+    for (auto [_, shot] : shots) {
+    //for (size_t i = 0; i < shots.size(); i++) {
+        // Shot shot = shots[i];
 
         Vector2 shot_point = fieldPosToScreenPos(screen, ship, shot.pos);
         DrawCircleV(shot_point, 5, RED);
@@ -233,29 +254,26 @@ Screen initScreen(int w, int h) {
     };
 }
 
-void addShot(Screen& screen, std::vector<Shot>& shots, Ship& ship) {
+void addShot(std::unordered_map<std::string, Shot>& shots, Ship& ship) {
     if (shots.size() < MAX_SHOTS) {
-        Shot shot = buildShot(ship.pos, ship.dir);
-        shots.push_back(shot);
+        shots[genUuid()] = buildShot(ship.pos, ship.dir);
     }
 }
 
-void moveShots(std::vector<Shot>& shots) {
-    std::vector<size_t> to_remove;
+void moveShots(std::unordered_map<std::string, Shot>& shots) {
+    std::vector<std::string> toRemove;
 
-    for (size_t i = 0; i < shots.size(); i++) {
-        Shot& shot = shots[i];
-
+    for (auto& [shotId, shot] : shots) {
         if (isShotOnField(shot, fieldSize.w, fieldSize.h)) {
             moveShot(shot);
         }
         else {
-            to_remove.push_back(i);
+            toRemove.push_back(shotId);
         }
     }
 
-    for (size_t i = to_remove.size(); i-- > 0; ) {
-        shots.erase(shots.begin() + to_remove[i]);
+    for (auto shotId : toRemove) {
+        shots.erase(shotId);
     }
 }
 
@@ -338,27 +356,23 @@ void drawScore(Screen& screen, uint64_t score) {
     DrawTextEx(font, buf.c_str(), textPos, (float)font.baseSize, 2, LIGHTGRAY);
 }
 
-void moveAsteroids(std::vector<Asteroid>& asteroids) {
-    for (size_t i = 0; i < asteroids.size(); i++) {
-        Asteroid& asteroid = asteroids[i];
-
-        rotateAsteroid(asteroid);
-        moveAsteroid(asteroid);
+void moveAsteroids(std::unordered_map<std::string, Asteroid>& asteroids) {
+    for (auto& [_, a] : asteroids) {
+        rotateAsteroid(a);
+        moveAsteroid(a);
     }
 }
 
-void removeAsteroidsFromField(Screen screen, std::vector<Asteroid>& asteroids) {
-    std::vector<size_t> asteroids_to_remove;
-    for (size_t i = 0; i < asteroids.size(); i++) {
-        Asteroid& asteroid = asteroids[i];
-        if (!isAsteroidOnField(screen, asteroid)) {
-            asteroids_to_remove.push_back(i);
-            continue;
+void removeAsteroidsFromField(const Screen& screen, std::unordered_map<std::string, Asteroid>& asteroids) {
+    std::vector<std::string> toRemove;
+    for (auto& [id, a] : asteroids) {
+        if (!isAsteroidOnField(screen, a)) {
+            toRemove.push_back(id);
         }
     }
 
-    for (size_t i = asteroids_to_remove.size(); i-- > 0; ) {
-        asteroids.erase(asteroids.begin() + asteroids_to_remove[i]);
+    for (auto id : toRemove) {
+        asteroids.erase(id);
     }
 }
 
@@ -384,10 +398,9 @@ int main(void) {
 
     Ship ship = buildShip(fieldSize.w, fieldSize.h);
 
-    std::vector<Shot> shots;
-
-    std::vector<Asteroid> asteroids;
-    std::vector<Asteroid> shards;
+    std::unordered_map<std::string, Shot> shots;
+    std::unordered_map<std::string, Asteroid> asteroids;
+    std::unordered_map<std::string, Asteroid> shards;
 
     while (!WindowShouldClose()) {
         if (IsWindowResized()) {
@@ -418,7 +431,7 @@ int main(void) {
             ship.is_engine_working = false;
 
             if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                addShot(screen, shots, ship);
+                addShot(shots, ship);
             }
 
             if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
@@ -444,9 +457,10 @@ int main(void) {
             slowdownShip(ship, fieldSize.w, fieldSize.h);
 
             // Add asteroids
+
             if (asteroids.size() < MAX_ASTEROIDS_COUNT) {
                 for (size_t i = 0; i < MAX_ASTEROIDS_COUNT - asteroids.size(); i++) {
-                    asteroids.push_back(getRandAsteroid(screen));
+                    asteroids[genUuid()] = getRandAsteroid(screen);
                 }
             }
 
@@ -457,13 +471,12 @@ int main(void) {
             moveAsteroids(asteroids);
 
             {
-                std::vector<size_t> asteroids_to_remove;
-                std::vector<size_t> shots_to_remove;
+                std::vector<std::string> asteroidsToRemove;
+                std::vector<std::string> shotsToRemove;
 
-                for (size_t i = 0; i < asteroids.size(); i++) {
-                    Asteroid& asteroid = asteroids[i];
-
+                for (auto [asteroidId, asteroid] : asteroids) {
                     std::vector<Vector2> asteroidVerticesFieldPos;
+
                     for (Vector2 v : asteroid.vertices) {
                         Vector2 p = Vector2Add(asteroid.pos, v);
                         asteroidVerticesFieldPos.push_back(p);
@@ -472,30 +485,32 @@ int main(void) {
                     // check asteroid and ship collision
 
                     if (checkShipCollisionWithPoly(ship, asteroidVerticesFieldPos)) {
-                        asteroids_to_remove.push_back(i);
+                        asteroidsToRemove.push_back(asteroidId);
                         continue;
                     }
 
-                    for (size_t j = 0; j < shots.size(); j++) {
-                        Shot& shot = shots[j];
+                    for (auto& [shotId, shot] : shots) {
                         if (CheckPointCollisionWithPoly(shot.pos, asteroidVerticesFieldPos)) {
-                            shots_to_remove.push_back(j);
-                            asteroids_to_remove.push_back(i);
                             score++;
 
-                            // shards
                             std::vector<Asteroid> asteroidShards = asteroidToShards(asteroid);
-                            shards.insert(shards.end(), asteroidShards.begin(), asteroidShards.end());
+
+                            for (auto shard : asteroidShards) {
+                                shards[genUuid()] = shard;
+                            }
+
+                            asteroidsToRemove.push_back(asteroidId);
+                            shotsToRemove.push_back(shotId);
                         }
                     }
                 }
 
-                for (size_t i = asteroids_to_remove.size(); i-- > 0; ) {
-                    asteroids.erase(asteroids.begin() + asteroids_to_remove[i]);
+                for (auto asteroidId : asteroidsToRemove) {
+                    asteroids.erase(asteroidId);
                 }
 
-                for (size_t i = shots_to_remove.size(); i-- > 0; ) {
-                    shots.erase(shots.begin() + shots_to_remove[i]);
+                for (auto shotId : shotsToRemove) {
+                    shots.erase(shotId);
                 }
             }
 
@@ -510,11 +525,11 @@ int main(void) {
 
             drawShots(screen, ship, shots);
 
-            for (Asteroid& asteroid : asteroids) {
+            for (auto [_, asteroid] : asteroids) {
                 drawAsteroid(screen, ship, asteroid);
             }
 
-            for (Asteroid& shard : shards) {
+            for (auto [_, shard] : shards) {
                 drawAsteroid(screen, ship, shard);
             }
 

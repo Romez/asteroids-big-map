@@ -1,6 +1,4 @@
 #include "./asteroid.h"
-#include <raylib.h>
-#include <raymath.h>
 #include <vector>
 #include <deque>
 #include <algorithm>
