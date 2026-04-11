@@ -1,5 +1,3 @@
-#include "include/raylib.h"
-#include "include/raymath.h"
 #include <iostream>
 #include <assert.h>
 #include <math.h>
@@ -13,6 +11,9 @@
 #include <vector>
 #include <array>
 #include <format>
+#include "./asteroid.h"
+#include "./ship.h"
+#include "./shot.h"
 
 #define MAX_SHOTS 100
 
@@ -27,194 +28,45 @@
 
 #define MAX(a, b) (a > b ? (a) : (b))
 
-const float ROTATION_SPEED = PI / 32;
-const float MAX_SPEED = 6;
-
 const int NET_GAP = 100;
 
-const int fieldWidth = 2000;
-const int fieldHeight = 2000;
+struct FieldSize {
+    int w;
+    int h;
+};
+
+const FieldSize fieldSize = {2000, 1000};
 
 Font font;
-
-enum turn {
-    LEFT,
-    RIGHT,
-};
-
-enum move {
-    FORWARD,
-    BACKWARD,
-};
-
-struct Ship {
-    Vector2 dir = (Vector2){ 1, 0 };;
-    Vector2 pos = (Vector2){ fieldWidth / 2.0f, fieldHeight / 2.0f };
-    float speed = 0;
-    bool is_engine_working = false;
-
-    void rotate(enum turn t) {
-        dir = Vector2Rotate(dir, t == LEFT ? -ROTATION_SPEED : ROTATION_SPEED);
-    }
-
-    void move(enum move m) {
-        if (m == FORWARD) {
-            if (speed < MAX_SPEED) {
-                speed += 0.2;
-            }
-            is_engine_working = true;
-        }
-        else if (m == BACKWARD) {
-            if (speed > -MAX_SPEED) {
-                speed -= 0.2;
-            }
-            is_engine_working = true;
-        }
-        else {
-            assert(false && "Unexpected move type");
-        }
-    }
-
-    void slowdown() {
-        if (speed != 0) {
-            Vector2 new_pos = Vector2Add(pos, Vector2Scale(dir, speed));
-
-            if (0 <= new_pos.x && new_pos.x < fieldWidth) {
-                pos.x = new_pos.x;
-            }
-
-            if (0 <= new_pos.y && new_pos.y < fieldHeight) {
-                pos.y = new_pos.y;
-            }
-
-            if (speed > 0) {
-                if (speed > 0.07) {
-                    speed -= 0.07;
-                }
-                else {
-                    speed = 0.0;
-                }
-            }
-
-            if (speed < 0) {
-                if (speed < 0.07) {
-                    speed += 0.07;
-                }
-                else {
-                    speed = 0.0;
-                }
-            }
-        }
-    }
-
-    std::array<Vector2, 3> getVertices() {
-        std::array<Vector2, 3> vs;
-        vs[0] = Vector2Scale(dir, 15);
-
-        float l = (3 * PI) / 4;
-        vs[1] = Vector2Rotate(vs[0], l);
-
-        float r = (5 * PI) / 4;
-        vs[2] = Vector2Rotate(vs[0], r);
-
-        return vs;
-    }
-};
-
-struct Shot {
-    Vector2 pos;
-    Vector2 dir;
-
-    bool isShotOnField() {
-        return 0 <= pos.x && pos.x <= fieldWidth && 0 <= pos.y && pos.y <= fieldHeight;
-    }
-
-    void move() {
-        Vector2 shot_speed = Vector2Scale(dir, 10);
-        pos = Vector2Add(pos, shot_speed);
-    }
-};
 
 struct Screen {
     int w;
     int h;
     Vector2 center;
+    float gap;
 };
 
-Vector2 centerPoint(std::vector<Vector2> vertices) {
-    float x = 0;
-    float y = 0;
-    float a = 0;
+enum class GameScreen {
+    TITLE,
+    GAME,
+};
 
-    size_t n = vertices.size();
-
-    for (size_t i = 0; i < n; i++) {
-        float x1 = vertices[i].x;
-        float y1 = vertices[i].y;
-
-        float x2 = vertices[(i + 1) % n].x;
-        float y2 = vertices[(i + 1) % n].y;
-
-        a += x1 * y2 - x2 * y1;
-
-        float cross = (x1 * y2 - x2 * y1);
-        x += (x1 + x2) * cross;
-        y += (y1 + y2) * cross;
+bool isAsteroidOnField(Screen& screen, Asteroid& asteroid) {
+    auto pos = asteroid.pos;
+    if (-screen.gap <= pos.x && pos.x <= fieldSize.w + screen.gap &&
+        -screen.gap <= pos.y && pos.y <= fieldSize.h + screen.gap) {
+        return true;
     }
 
-    x /= (3 * a);
-    y /= (3 * a);
-
-    return Vector2{ x, y };
-}
-
-const float rotationAngle = 0.05;
-
-float fieldGap = 100;
-
-struct Asteroid {
-    Vector2 pos;
-    Vector2 dir;
-    std::vector<Vector2> vertices;
-    Vector2 polyCenter;
-
-    Asteroid() {}
-
-    Asteroid(Vector2 pos, Vector2 dir, std::vector<Vector2> vertices) : pos(pos), dir(dir), vertices(vertices) {
-        polyCenter = centerPoint(vertices);
-    }
-
-    void rotate() {
-        for (size_t i = 0; i < vertices.size(); i++) {
-            Vector2 p = vertices[i];
-            p = Vector2Subtract(p, polyCenter);
-            p = Vector2Rotate(p, rotationAngle);
-            p = Vector2Add(p, polyCenter);
-
-            vertices[i] = p;
-        }
-    }
-
-    void move() {
-        pos = Vector2Add(pos, dir);
-    }
-
-    bool isOnField(Screen& screen, Ship& ship) {
-        if (-fieldGap <= pos.x && pos.x <= fieldWidth + fieldGap &&
-            -fieldGap <= pos.y && pos.y <= fieldHeight + fieldGap) {
+    for (Vector2 vertex : asteroid.vertices) {
+        Vector2 p = Vector2Add(pos, vertex);
+        if (-screen.gap <= p.x && p.x <= fieldSize.w + screen.gap &&
+            -screen.gap <= p.y && p.y <= fieldSize.h + screen.gap) {
             return true;
         }
-
-        for (Vector2 vertex : vertices) {
-            Vector2 p = Vector2Add(pos, vertex);
-            if (-fieldGap <= p.x && p.x <= fieldWidth + fieldGap &&
-                -fieldGap <= p.y && p.y <= fieldHeight + fieldGap) {
-                return true;
-            }
-        }
-        return false;
     }
-};
+    return false;
+}
 
 void drawNet(Screen& screen, Ship& ship) {
     // Net vertical
@@ -247,8 +99,8 @@ void drawNet(Screen& screen, Ship& ship) {
         DrawLine(0, y, screen.w, y, NET_BORDER_COLOR);
     }
 
-    if (fieldHeight - ship.pos.y < screen.center.y) {
-        int gap = screen.center.y - (fieldHeight - ship.pos.y);
+    if (fieldSize.h - ship.pos.y < screen.center.y) {
+        int gap = screen.center.y - (fieldSize.h - ship.pos.y);
         int y = screen.h - gap;
         DrawLine(0, y, screen.w, y, NET_BORDER_COLOR);
     }
@@ -258,15 +110,15 @@ void drawNet(Screen& screen, Ship& ship) {
         DrawLine(x, 0, x, screen.h, NET_BORDER_COLOR);
     }
 
-    if (fieldWidth - ship.pos.x < screen.center.x) {
-        int gap = screen.center.x - (fieldWidth - ship.pos.x);
+    if (fieldSize.w - ship.pos.x < screen.center.x) {
+        int gap = screen.center.x - (fieldSize.w - ship.pos.x);
         int x = screen.w - gap;
         DrawLine(x, 0, x, screen.h, NET_BORDER_COLOR);
     }
 }
 
 void drawShip(Screen& screen, Ship& ship) {
-    auto [v1, v2, v3] = ship.getVertices();
+    auto [v1, v2, v3] = getShipVertices(ship);
 
     v1 = Vector2Add(screen.center, v1);
     v2 = Vector2Add(screen.center, v2);
@@ -367,23 +219,22 @@ void drawAsteroid(Screen& screen, Ship& ship, Asteroid& asteroid) {
 }
 
 Screen initScreen(int w, int h) {
-    return (Screen) {
+    float gap = static_cast<float>(MAX(w, h) / 2);
+    Vector2 center = {
+        .x = w / 2.0f,
+        .y = h / 2.0f,
+    };
+    return {
         .w = w,
-            .h = h,
-            .center = (Vector2){
-                .x = w / 2.0f,
-                .y = h / 2.0f,
-        },
+        .h = h,
+        .center = center,
+        .gap = gap,
     };
 }
 
 void addShot(Screen& screen, std::vector<Shot>& shots, Ship& ship) {
     if (shots.size() < MAX_SHOTS) {
-        Shot shot = {
-            .pos = ship.pos,
-            .dir = Vector2Scale(Vector2Normalize(ship.dir), 1),
-        };
-
+        Shot shot = buildShot(ship.pos, ship.dir);
         shots.push_back(shot);
     }
 }
@@ -394,8 +245,8 @@ void moveShots(std::vector<Shot>& shots) {
     for (size_t i = 0; i < shots.size(); i++) {
         Shot& shot = shots[i];
 
-        if (shot.isShotOnField()) {
-            shot.move();
+        if (isShotOnField(shot, fieldSize.w, fieldSize.h)) {
+            moveShot(shot);
         }
         else {
             to_remove.push_back(i);
@@ -431,7 +282,7 @@ bool CheckPointCollisionWithPoly(Vector2 p, std::vector<Vector2>& points) {
 }
 
 bool checkShipCollisionWithPoly(Ship& ship, std::vector<Vector2>& points) {
-    auto [v1, v2, v3] = ship.getVertices();
+    auto [v1, v2, v3] = getShipVertices(ship);
     v1 = Vector2Add(ship.pos, v1);
     v2 = Vector2Add(ship.pos, v2);
     v3 = Vector2Add(ship.pos, v3);
@@ -452,33 +303,32 @@ std::vector<std::vector<Vector2>> asteroidsLibarary = {
     }
 };
 
-Asteroid getRandAsteroid() {
+Asteroid getRandAsteroid(Screen& screen) {
     int i = GetRandomValue(0, asteroidsLibarary.size() - 1);
 
-    int side = GetRandomValue(0, 3);
+    int radomSide = GetRandomValue(0, 3);
 
     Vector2 pos;
     Vector2 dir;
-    Asteroid asteroid;
 
-    if (side == 0) { // top
-        pos = Vector2{ (float)GetRandomValue(0, fieldWidth), -fieldGap };
+    if (radomSide == 0) { // top
+        pos = Vector2{ (float)GetRandomValue(0, fieldSize.w), -screen.gap };
         dir = Vector2{ (float)GetRandomValue(1, 3), (float)GetRandomValue(1, 3) };
     }
-    else if (side == 1) { // right
-        pos = Vector2{ fieldWidth + fieldGap, (float)GetRandomValue(0, fieldHeight) };
+    else if (radomSide == 1) { // right
+        pos = Vector2{ fieldSize.w + screen.gap, (float)GetRandomValue(0, fieldSize.h) };
         dir = Vector2{ (float)GetRandomValue(-3, -1), (float)GetRandomValue(-3, 3) };
     }
-    else if (side == 2) { // bottom
-        pos = Vector2{ (float)GetRandomValue(0, fieldWidth), fieldHeight + fieldGap};
+    else if (radomSide == 2) { // bottom
+        pos = Vector2{ (float)GetRandomValue(0, fieldSize.w), fieldSize.h + screen.gap};
         dir = Vector2{ (float)GetRandomValue(-3, 3), (float)GetRandomValue(-3, -1) };
     }
     else { // left
-        pos = Vector2{ -fieldGap, (float)GetRandomValue(0, fieldHeight) };
+        pos = Vector2{ -screen.gap, (float)GetRandomValue(0, fieldSize.h) };
         dir = Vector2{ (float)GetRandomValue(1, 3), (float)GetRandomValue(-3, 3) };
     }
 
-    return Asteroid(pos, dir, asteroidsLibarary[i]);
+    return buildAsteroid(pos, dir, asteroidsLibarary[i]);
 }
 
 void drawScore(Screen& screen, uint64_t score) {
@@ -487,14 +337,7 @@ void drawScore(Screen& screen, uint64_t score) {
     DrawTextEx(font, buf.c_str(), textPos, (float)font.baseSize, 2, LIGHTGRAY);
 }
 
-enum class GameScreen {
-    TITLE,
-    GAME,
-};
-
 int main(void) {
-    // Initialization
-    //--------------------------------------------------------------------------------------
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 
     InitWindow(INIT_SCREEN_WIDTH, INIT_SCREEN_HEIGHT, "Asteroids");
@@ -506,32 +349,27 @@ int main(void) {
 
     SetTargetFPS(60);
 
-    //--------------------------------------------------------------------------------------
-
     bool debugDisplay = false;
 
     GameScreen gameScreen = GameScreen::TITLE;
 
-    uint64_t score = 0;
-
-    Ship ship;
-
-    std::vector<Shot> shots;
-
     Screen screen = initScreen(GetScreenWidth(), GetScreenHeight());
 
-    fieldGap = MAX(GetScreenWidth(), GetScreenHeight()) / 2.0;
+    uint64_t score = 0;
+
+    Ship ship = buildShip(fieldSize.w, fieldSize.h);
+
+    std::vector<Shot> shots;
 
     std::vector<Asteroid> asteroids;
 
     while (!WindowShouldClose()) {
         if (IsWindowResized()) {
             screen = initScreen(GetScreenWidth(), GetScreenHeight());
-            fieldGap = MAX(GetScreenWidth(), GetScreenHeight()) / 2.0;
         }
 
         if (gameScreen == GameScreen::TITLE) {
-            if (IsKeyPressed(KEY_ENTER)) {
+            if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
                 gameScreen = GameScreen::GAME;
             }
 
@@ -539,7 +377,7 @@ int main(void) {
 
             ClearBackground(DARKGRAY);
 
-            std::string text = "Press Enter to start";
+            std::string text = "Press Enter/Space to start";
             Vector2 textSize = MeasureTextEx(font, text.c_str(), font.baseSize, 2);
 
             Vector2 textPos = {
@@ -550,8 +388,7 @@ int main(void) {
             DrawTextEx(font, text.c_str(), textPos, (float)font.baseSize, 2, LIGHTGRAY);
 
             EndDrawing();
-        }
-        else if (gameScreen == GameScreen::GAME) {
+        } else if (gameScreen == GameScreen::GAME) {
             ship.is_engine_working = false;
 
             if (IsKeyPressed(KEY_SPACE) || IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
@@ -559,30 +396,30 @@ int main(void) {
             }
 
             if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) {
-                ship.rotate(LEFT);
+                rotateShip(ship, LEFT);
             }
 
             if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) {
-                ship.rotate(RIGHT);
+                rotateShip(ship, RIGHT);
             }
 
             if (IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) {
-                ship.move(FORWARD);
+                moveShip(ship, FORWARD);
             }
 
             if (IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S)) {
-                ship.move(BACKWARD);
+                moveShip(ship, BACKWARD);
             }
 
             if (IsKeyPressed(KEY_L)) {
                 debugDisplay = !debugDisplay;
             }
 
-            ship.slowdown();
+            slowdownShip(ship, fieldSize.w, fieldSize.h);
 
             // Add asteroids
             for (size_t i = 0; i < MAX_ASTEROIDS_COUNT - asteroids.size(); i++) {
-                asteroids.push_back(getRandAsteroid());
+                asteroids.push_back(getRandAsteroid(screen));
             }
 
             {
@@ -592,10 +429,10 @@ int main(void) {
                 for (size_t i = 0; i < asteroids.size(); i++) {
                     Asteroid& asteroid = asteroids[i];
 
-                    asteroid.rotate();
-                    asteroid.move();
+                    rotateAsteroid(asteroid);
+                    moveAsteroid(asteroid);
 
-                    if (!asteroid.isOnField(screen, ship)) {
+                    if (!isAsteroidOnField(screen, asteroid)) {
                         asteroids_to_remove.push_back(i);
                         continue;
                     }
@@ -657,10 +494,7 @@ int main(void) {
         }
     }
 
-    // De-Initialization
-    //--------------------------------------------------------------------------------------
-    CloseWindow(); // Close window and OpenGL context
-    //--------------------------------------------------------------------------------------
+    CloseWindow();
 
     std::cout << "Buy!" << std::endl;
 

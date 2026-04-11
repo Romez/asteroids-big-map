@@ -1,10 +1,12 @@
 .PHONY: clean
 
-asteroids: main.cpp
-	g++ -fsanitize=address -std=c++23 -Wall -I./include main.cpp -o main ./lib/libraylib.a -lm
+AST_SRC = src/main.cpp src/asteroid.cpp src/ship.cpp src/shot.cpp
+
+asteroids: src/main.cpp
+	g++ -fsanitize=address -std=c++23 -Wall -I./include $(AST_SRC) -o main ./lib/libraylib.a -lm
 
 asteroid_builder:
-	g++ -Wall -fsanitize=address -std=c++23 -I./includes asteroid_builder.cpp -o main ./lib/libraylib.a -lm
+	g++ -Wall -fsanitize=address -std=c++23 -I./includes src/asteroid_builder.cpp -o main ./lib/libraylib.a -lm
 
 clear:
 	rm ./asteroids

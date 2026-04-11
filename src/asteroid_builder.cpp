@@ -245,6 +245,10 @@ int main() {
             shape.active = false;
         }
 
+        if (IsKeyPressed(KEY_D)) {
+            
+        }
+
         if (shape.isPointSelected()) {
             Vector2 pos = GetMousePosition();
             shape.moveSelectedPoint(pos);
