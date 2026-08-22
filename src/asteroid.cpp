@@ -60,40 +60,24 @@ void moveAsteroid(Asteroid& asteroid) {
 }
 
 std::vector<Asteroid> asteroidToShards(Asteroid& asteroid) {
-    ssize_t depth = 3;
+    std::vector<Asteroid> shards = {};
 
-    std::vector<Asteroid> shards = {asteroid};
+    size_t v_size = asteroid.vertices.size();
+    for (size_t j = 0; j < v_size; j++) {
+        Vector2 v1 = asteroid.vertices[j];
+        Vector2 v2 = asteroid.vertices[(j + 1) % v_size];
+        Vector2 v3 = asteroid.polyCenter;
 
-    while(depth > 0) {
-        size_t batch_size = shards.size();
-        if (batch_size > 1) {
-            batch_size /= 2;
-        }
+        Vector2 dir = Vector2Scale(Vector2Normalize(v1), 3);
 
-        for (size_t i = 0; i < batch_size; i++) {
-            Asteroid a = shards.back();
-            shards.pop_back();
+        Vector2 pos = Vector2Add(asteroid.pos, dir);
 
-            size_t v_size = a.vertices.size();
-            for (size_t j = 0; j < v_size; j++) {
-                Vector2 v1 = a.vertices[j];
-                Vector2 v2 = a.vertices[(j + 1) % v_size];
-                Vector2 v3 = a.polyCenter;
+        Asteroid shard = buildAsteroid(pos, dir, {v1, v2, v3});
 
-                Vector2 dir = Vector2Scale(Vector2Normalize(v1), 3);
-
-                Vector2 pos = Vector2Add(a.pos, dir);
-
-                Asteroid shard = buildAsteroid(pos, dir, {v1, v2, v3});
-
-                shards.push_back(shard);
-            }
-        }
-
-        std::shuffle(shards.begin(), shards.end(), rng);
-
-        depth--;
+        shards.push_back(shard);
     }
+
+    std::shuffle(shards.begin(), shards.end(), rng);
 
     return shards;
 }

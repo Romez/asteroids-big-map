@@ -425,8 +425,6 @@ void updateGame(const Screen& screen, GameState& gameState) {
 
             auto shotIdx = findShotCollidedWithAsteroid(gameState.shots, asteroid);
             if (shotIdx) {
-                gameState.score++;
-
                 std::vector<Asteroid> asteroidShards = asteroidToShards(asteroid);
                 gameState.shards.insert(gameState.shards.end(),
                                         asteroidShards.begin(),
@@ -437,6 +435,8 @@ void updateGame(const Screen& screen, GameState& gameState) {
 
                 gameState.asteroids[i] = gameState.asteroids.back();
                 gameState.asteroids.pop_back();
+
+                gameState.score++;
             } else {
                 i++;
             }
