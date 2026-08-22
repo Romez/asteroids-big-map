@@ -57,6 +57,25 @@ const std::vector<std::vector<Vector2>> asteroidsLibrary = {
         Vector2{ 0, -40 },
         Vector2{ 82, -48 },
         Vector2{ 126, 12 },
+    },
+    std::vector<Vector2> {
+        Vector2 {-11, -25},
+        Vector2 {58, -7},
+        Vector2 {72, 69},
+        Vector2 {-31, 56},
+        Vector2 {-67, 6}
+    },
+    std::vector<Vector2>{
+        Vector2 {-38, -29},
+        Vector2 {12, -38},
+        Vector2 {18, -90},
+        Vector2 {87, -72},
+        Vector2 {122, -26},
+        Vector2 {96, 5},
+        Vector2 {104, 57},
+        Vector2 {43, 62},
+        Vector2 {18, 44},
+        Vector2 {25, 16}
     }
 };
 
